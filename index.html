@@ -137,6 +137,18 @@ tr.click:hover td{background:#f7fafc}
 .reasons{color:var(--muted);font-size:14px;max-width:340px}
 .muted{color:var(--muted)}
 .comp-row td{background:#fafcfd;font-size:14px;padding:8px 12px}
+#matTbl{font-size:14px;table-layout:auto}
+#matTbl th,#matTbl td{padding:8px 7px}
+#matTbl th{font-size:11px;letter-spacing:.03em}
+#matTbl td.ar{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#matTbl td:nth-child(4){max-width:130px;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1400px){
+  #matTbl{font-size:13px}
+  #matTbl th,#matTbl td{padding:7px 5px}
+  #matTbl th{font-size:10.5px}
+  #matTbl td.ar{max-width:175px}
+  #matTbl td:nth-child(4){max-width:96px;white-space:nowrap}
+}
 .section{margin-top:22px}
 
 /* delivery matrix */
@@ -382,7 +394,8 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <div class="chips" id="matChips"></div>
       <div class="tbl-wrap"><table id="matTbl"></table></div>
       <p class="hint">On hand = receipts − issues ± adjustments. Theoretical use = planned qty × (units completed ÷ department plan). Remaining need = planned − theoretical use.<br>
-      Required to date = planned qty × (units due by the status date ÷ department plan), taken from the client delivery schedule. Shortfall = required to date − (receipts ± adjustments); the % is of that date requirement, not of the whole project.</p>
+      Required to date = planned qty × (units due by the status date ÷ department plan), taken from the client delivery schedule. Shortfall = required to date − (receipts ± adjustments); the % is of that date requirement, not of the whole project.<br>
+      Issues and adjustments are folded into On hand — hover it for the breakdown, or see the movement log below and the Excel export.</p>
     </article>
     <article class="panel section">
       <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent material movements</h2></div></div>
@@ -1091,18 +1104,18 @@ function renderMaterials(log) {
   $$('#matChips .chip').forEach(b => b.onclick = () => { S.matStatus = b.dataset.k; renderMaterials(log); });
   if (S.matStatus) rows = rows.filter(r => r.status === S.matStatus);
   rows.sort((a, b) => b.shortfall - a.shortfall || b.remaining_req - a.remaining_req);
-  $('#matTbl').innerHTML = `<thead><tr><th>Material</th><th>Status</th><th>Department</th><th>Used by</th><th class="n">Planned</th><th class="n">Received</th><th class="n">Issued</th>
-    <th class="n">Adjusted</th><th class="n">On hand</th><th class="n">Theoretical use</th><th class="n">Remaining need</th><th>Coverage</th>
-    <th class="n">Required to date</th><th class="n">Shortfall</th><th class="n">Shortfall %</th></tr></thead><tbody>` +
-    (rows.map(m => `<tr><td class="ar" style="text-align:right;min-width:200px">${esc(m.name_ar)}</td>
-      <td><span class="pill ${m.status}">${MSTAT[m.status]}</span></td><td>${m.stages.map(s => STAGE[s]).join(', ')}</td><td>${m.product_ids.map(pname).join(', ')}</td>
-      <td class="n">${fmt2(m.planned)}</td><td class="n">${fmt2(m.received)}</td><td class="n">${fmt2(m.issued)}</td><td class="n">${fmt2(m.adjusted)}</td>
-      <td class="n"><b>${fmt2(m.on_hand)}</b></td><td class="n">${fmt2(m.theoretical_use)}</td><td class="n">${fmt2(m.remaining_req)}</td>
-      <td>${m.coverage == null ? '<span class="muted">—</span>' : `<div class="mini" style="min-width:120px"><div class="bar"><div class="d" style="width:${Math.min(100, m.coverage * 100).toFixed(1)}%"></div></div><em>${pct(m.coverage, 0)}</em></div>`}</td>
+  $('#matTbl').innerHTML = `<thead><tr><th>Material</th><th>Status</th><th>Dept</th><th>Used by</th><th class="n">Planned</th><th class="n">Received</th><th class="n">On hand</th><th class="n" title="Planned qty × units completed ÷ department plan">Theor. use</th><th class="n">Remaining</th><th class="n">Cover</th>
+    <th class="n">Req. to date</th><th class="n">Short</th><th class="n">Short %</th></tr></thead><tbody>` +
+    (rows.map(m => `<tr><td class="ar" style="text-align:right" title="${esc(m.name_ar)}">${esc(m.name_ar)}</td>
+      <td><span class="pill ${m.status}">${MSTAT[m.status]}</span></td><td>${m.stages.map(s => STAGE[s]).join(', ')}</td>
+      <td title="${esc(m.product_ids.map(pname).join(', '))}" style="white-space:nowrap">${esc(pname(m.product_ids[0]))}${m.product_ids.length > 1 ? ` <span class="muted">+${m.product_ids.length - 1}</span>` : ''}</td>
+      <td class="n">${fmt2(m.planned)}</td><td class="n">${fmt2(m.received)}</td>
+      <td class="n" title="Received ${fmt2(m.received)} − issued ${fmt2(m.issued)} ${m.adjusted < 0 ? '−' : '+'} adjusted ${fmt2(Math.abs(m.adjusted))}"><b>${fmt2(m.on_hand)}</b></td><td class="n">${fmt2(m.theoretical_use)}</td><td class="n">${fmt2(m.remaining_req)}</td>
+      <td class="n">${m.coverage == null ? '<span class="muted">—</span>' : `<span title="On hand ÷ remaining need" style="color:${m.coverage >= 1 ? 'var(--green)' : m.coverage > 0 ? 'var(--amber)' : 'var(--red)'};font-weight:800">${pct(m.coverage, 0)}</span>`}</td>
       <td class="n">${fmt2(m.required_to_date)}</td>
       <td class="n" ${m.shortfall > 0 ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt2(m.shortfall)}</td>
       <td class="n" ${m.shortfall_pct >= 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${m.shortfall_pct == null ? '<span class="muted">—</span>' : pct(m.shortfall_pct, 0)}</td></tr>`).join('') ||
-      '<tr><td colspan="15" class="empty-state">No materials match.</td></tr>') + '</tbody>';
+      '<tr><td colspan="13" class="empty-state">No materials match.</td></tr>') + '</tbody>';
   renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material');
 }
 
