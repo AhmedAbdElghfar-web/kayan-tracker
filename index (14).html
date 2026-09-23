@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KAYAN · Manufacturing & Delivery Control</title>
+<meta name="theme-color" content="#0f2a43">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KAYAN Tracker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f2a43'/%3E%3Crect x='12' y='34' width='10' height='18' fill='%2333b0d6'/%3E%3Crect x='27' y='24' width='10' height='28' fill='%2333b0d6'/%3E%3Crect x='42' y='12' width='10' height='40' fill='%2333b0d6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#0f2a43; --navy-2:#16395a; --ink:#10263b; --muted:#5d6d7e; --faint:#8a98a6;
+  --bg:#eef2f5; --card:#ffffff; --line:#dfe6ec; --track:#e8edf1; --target:#cfd9e1;
+  --teal:#2a9fc9; --teal-d:#1b7aa0; --amber:#e3a826; --red:#d23a4f; --red-bg:#fde6e9;
+  --green:#1f9d6b; --green-bg:#dff4ea; --orange:#e5822b; --amber-bg:#fdf1d8;
+  --radius:14px; --shadow:0 1px 2px rgba(16,38,59,.06),0 4px 14px rgba(16,38,59,.05);
+  --font:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif; --ar:'Cairo','Segoe UI',Tahoma,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{font-family:var(--font);color:var(--ink);background:var(--bg);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.ar{font-family:var(--ar);direction:rtl;unicode-bidi:isolate}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid rgba(42,159,201,.45);outline-offset:2px}
+.wrap{max-width:1500px;margin:0 auto;padding:0 clamp(16px,3.5vw,56px)}
+
+/* header */
+header.top{background:var(--navy);color:#fff}
+header.top .wrap{display:flex;align-items:center;gap:24px;min-height:128px;padding-block:18px}
+.logo{display:flex;align-items:flex-end;gap:5px;height:60px;flex:none}
+.logo i{display:block;width:14px;background:#33b0d6}
+.logo i:nth-child(1){height:40%}.logo i:nth-child(2){height:68%}.logo i:nth-child(3){height:100%}
+.brand{flex:1;min-width:0}
+.eyebrow{font-weight:900;letter-spacing:.18em;text-transform:uppercase;font-size:12.5px}
+header .eyebrow{color:#3bb7dd}
+.brand h1{margin:4px 0 0;font-size:clamp(22px,2.6vw,33px);font-weight:900;letter-spacing:-.01em;line-height:1.1}
+.through{display:flex;align-items:center;gap:10px;font-size:14px;color:#c9d6e2;line-height:1.25}
+.through b{display:block;color:#fff;font-size:18px;font-weight:800}
+.dot{width:12px;height:12px;border-radius:50%;background:#2fd08e;box-shadow:0 0 0 4px rgba(47,208,142,.18);flex:none}
+.dot.off{background:#e5822b;box-shadow:0 0 0 4px rgba(229,130,43,.2)}
+.btn-ghost{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:10px;padding:12px 20px;font-size:17px;font-weight:600;cursor:pointer}
+.btn-ghost:hover{background:rgba(255,255,255,.08)}
+
+/* tabs */
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+nav.tabs .wrap{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;padding:22px 16px 20px;font-size:20px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:4px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected=true]{color:var(--ink);font-weight:800;border-bottom-color:var(--teal)}
+nav.tabs .spacer{flex:1}
+nav.tabs .rec{color:var(--teal-d)}
+
+main{padding-block:28px 60px}
+[data-view=record]{margin-top:4px}
+.filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 16px;margin-bottom:28px}
+.field{display:flex;flex-direction:column;gap:8px}
+.field>span{font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#41505f}
+select,input[type=date],input[type=number],input[type=text],input[type=password],textarea{
+  background:#fff;border:1px solid #cdd7e0;border-radius:10px;padding:12px 14px;font-size:17px;min-height:52px}
+.filters select{min-width:200px}
+.filters .product select{min-width:320px}
+.linkbtn{background:none;border:0;color:var(--teal);font-weight:800;font-size:18px;cursor:pointer;padding:12px 8px}
+.inview{margin-left:auto;color:var(--muted);font-size:16px;padding-bottom:14px}
+.custom-range{display:none;gap:10px}
+.custom-range.on{display:flex}
+
+/* cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:22px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e3e9ee;border-top:5px solid var(--teal);padding:26px 26px 22px}
+.card.amber{border-top-color:var(--amber)} .card.red{border-top-color:var(--red)}
+.card h3{margin:0 0 14px;font-size:17px;font-weight:800;letter-spacing:.02em;color:#3c4a57}
+.metric{white-space:nowrap;font-size:clamp(28px,2.35vw,44px);font-weight:900;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums}
+.metric small{font-size:.62em;font-weight:800;color:#8796a4}
+.sub{color:var(--muted);font-size:16px;margin-top:10px}
+
+.grid2{display:grid;grid-template-columns:minmax(0,2.15fr) minmax(0,1fr);gap:22px;margin-bottom:22px}
+.panel{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e3e9ee;padding:28px}
+.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.panel .eyebrow{color:var(--teal)}
+.panel h2{margin:6px 0 0;font-size:23px;font-weight:800;letter-spacing:-.01em}
+.legend{display:flex;gap:18px;color:var(--muted);font-size:16px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+.bars{display:grid;grid-template-columns:minmax(110px,170px) 1fr 70px;gap:18px 20px;align-items:center}
+.bars .name{font-weight:800;font-size:17px;display:flex;align-items:center;gap:8px;min-width:0}
+.bars .name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rdot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--faint)}
+.rdot.critical{background:var(--red)}.rdot.at_risk{background:var(--amber)}.rdot.on_track{background:var(--green)}
+.bar{position:relative;height:26px;background:var(--track);border-radius:4px;overflow:hidden}
+.bar .t,.bar .d{position:absolute;left:0;top:0;bottom:0;border-radius:4px}
+.bar .t{background:var(--target)}
+.bar .d{background:linear-gradient(90deg,#35b1d7,var(--teal-d))}
+.bars .pct{text-align:right;font-weight:900;font-size:17px;font-variant-numeric:tabular-nums}
+.bars .pct.na{color:var(--ink)}
+
+/* readiness */
+.pill{display:inline-block;border-radius:999px;padding:5px 12px;font-size:14px;font-weight:900;white-space:nowrap}
+.pill.critical{background:var(--red-bg);color:#c32d44}
+.pill.at_risk{background:var(--amber-bg);color:#a8700b}
+.pill.on_track,.pill.covered,.pill.complete{background:var(--green-bg);color:#157a52}
+.pill.na{background:#eef1f4;color:var(--muted)}
+.pill.zero{background:var(--red-bg);color:#c32d44}
+.pill.short{background:var(--amber-bg);color:#a8700b}
+.ready{display:grid;grid-template-columns:200px 1fr;gap:26px;align-items:center}
+.donut{position:relative;width:200px;height:200px}
+.donut svg{transform:rotate(-90deg)}
+.donut .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.donut .c b{font-size:40px;font-weight:900;letter-spacing:-.02em}
+.donut .c span{color:var(--muted);font-size:15px;line-height:1.35;max-width:120px}
+.kv{list-style:none;margin:0;padding:0}
+.kv li{display:flex;justify-content:space-between;gap:12px;padding:15px 0;border-bottom:1px solid var(--line);font-size:17px}
+.kv li b{font-weight:900;font-variant-numeric:tabular-nums}
+.insight{margin-top:24px;background:#f5f7f9;border-left:4px solid var(--orange);padding:14px 18px;border-radius:0 8px 8px 0;font-size:16px;color:#34424f}
+
+/* tables */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{text-align:left;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#56677a;font-weight:900;padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
+td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer}
+tr.click:hover td{background:#f7fafc}
+.pname{min-width:210px}
+.pname b{display:block;font-weight:800}
+.pname .ar{font-size:13px;color:var(--muted);display:block;text-align:left;direction:rtl}
+.mini{display:flex;align-items:center;gap:10px;min-width:170px}
+.mini .bar{height:10px;flex:1}
+.mini em{font-style:normal;font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap;color:#34424f}
+.reasons{color:var(--muted);font-size:14px;max-width:340px}
+.muted{color:var(--muted)}
+.comp-row td{background:#fafcfd;font-size:14px;padding:8px 12px}
+.section{margin-top:22px}
+
+/* delivery matrix */
+.dm td.cell{text-align:center;font-variant-numeric:tabular-nums;font-size:14px;white-space:nowrap}
+.cell.future{color:var(--muted)}
+.cell.current{background:#fff7e6}
+.cell.short{background:#fdecee;color:#b3263b;font-weight:700}
+.cell.met{background:#e6f6ee;color:#157a52;font-weight:700}
+.cell.empty{color:#c3ccd4}
+.flow .pname{min-width:170px}
+.flow th.grp{text-align:center;border-bottom:0;padding-bottom:0;color:var(--teal-d)}
+.flow td.n.neg{color:var(--red);font-weight:800}
+.flow td.n.rta{color:var(--teal-d);font-weight:800}
+.flow td.sep,.flow th.sep{border-left:2px solid var(--line)}
+.flowmap{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px;color:var(--muted);font-size:14px}
+.flowmap b{background:#eef6fa;color:var(--teal-d);border-radius:8px;padding:6px 12px;font-weight:800}
+
+/* forms */
+.forms{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+form.panel{display:flex;flex-direction:column;gap:14px}
+form .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+form .field>span{font-size:12px}
+form select,form input,form textarea{font-size:16px;min-height:46px;padding:10px 12px;width:100%}
+.btn{background:var(--teal-d);color:#fff;border:0;border-radius:10px;padding:13px 18px;font-weight:800;font-size:16px;cursor:pointer}
+.btn:hover{background:#166a8b}
+.btn.secondary{background:#fff;color:var(--ink);border:1px solid #cdd7e0}
+.btn.danger{background:#fff;color:var(--red);border:1px solid #f0c3ca;padding:6px 12px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.hint{font-size:13px;color:var(--muted)}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.chip{border:1px solid #cdd7e0;background:#fff;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;font-size:14px}
+.chip[aria-pressed=true]{background:var(--navy);border-color:var(--navy);color:#fff}
+.cards.three{grid-template-columns:repeat(3,1fr)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1px solid var(--line);border-radius:12px;margin-bottom:22px}
+.kpis div{padding:14px 18px;border-left:1px solid var(--line)}
+.kpis div:first-child{border-left:0}
+.kpis span{display:block;font-size:12.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#56677a}
+.kpis b{display:block;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:4px}
+.kpis small{color:var(--muted);font-size:13px}
+.kpis .bad b{color:var(--red)}
+.tl{width:100%;height:auto;display:block}
+.tl text{font-family:var(--font);fill:#56677a;font-size:12px}
+.tl .v{fill:var(--ink);font-weight:800}
+.recbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid #e3e9ee;border-radius:var(--radius);padding:14px 18px;margin-bottom:22px;box-shadow:var(--shadow)}
+.recbar>span:first-child{font-size:13px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;color:#41505f}
+.recbar .chips{margin:0}
+.recbar .hint{margin-left:auto}
+
+.banner{display:none;background:#fdecee;color:#8c1d2f;border:1px solid #f3c2ca;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-weight:600}
+.banner.on{display:block}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#a3243a}
+dialog{border:0;border-radius:16px;padding:0;max-width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(15,42,67,.5)}
+dialog .panel{box-shadow:none;border:0}
+dialog .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.loading{opacity:.55;transition:opacity .2s}
+.empty-state{padding:30px;text-align:center;color:var(--muted)}
+pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;font-size:13px;max-height:220px;overflow:auto;font-family:var(--font)}
+[hidden]{display:none!important}
+
+@media (max-width:1180px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .forms{grid-template-columns:1fr 1fr}
+}
+@media (max-width:720px){
+  header.top .wrap{flex-wrap:wrap;min-height:0;gap:12px 14px}
+  .logo{height:40px;gap:4px}.logo i{width:9px}
+  .brand{flex:1 1 calc(100% - 60px)}
+  header .eyebrow{font-size:10.5px;letter-spacing:.12em}
+  .brand h1{font-size:22px}
+  .through{order:3;flex:1}.through b{font-size:16px}
+  .btn-ghost{order:4;padding:9px 14px;font-size:15px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .filters .product,.filters .custom-range.on,.filters .inview{grid-column:1/-1}
+  .filters .custom-range.on{display:grid;grid-template-columns:1fr 1fr}
+  .filters select,.filters input{font-size:15px;min-height:44px;padding:8px 10px}
+  .field>span{font-size:11px}
+  .linkbtn{font-size:15px;justify-self:start;padding:8px 0}
+  nav.tabs button{font-size:16px;padding:16px 10px 14px}
+  .cards,.cards.three,.forms{grid-template-columns:1fr}
+  .kpis{grid-template-columns:1fr 1fr}.kpis div{border-left:0;border-top:1px solid var(--line)}
+  .recbar .hint{margin-left:0}
+  .filters .field,.filters select,.filters input,.filters .product select{width:100%;min-width:0}
+  .inview{margin-left:0;padding:0}
+  .bars{grid-template-columns:96px 1fr 58px;gap:14px 10px}
+  .bars .name{font-size:14px}
+  .ready{grid-template-columns:1fr;justify-items:center}
+  .ready .kv{width:100%}
+  .panel{padding:20px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="logo" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="brand">
+      <div class="eyebrow">Kayan University Furniture Program</div>
+      <h1>Manufacturing &amp; Delivery Control</h1>
+    </div>
+    <div class="through" title="Latest entry date recorded in the tracker">
+      <span class="dot" id="liveDot"></span>
+      <div>Data through<b id="dataThrough">—</b></div>
+    </div>
+    <button class="btn-ghost" id="deckBtn" type="button" title="Status presentation (PowerPoint) built from the current data">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18M4 4v10h16V4M12 14v4m-4 3h8"/></svg>
+      Deck
+    </button>
+    <button class="btn-ghost" id="exportBtn" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+      Export
+    </button>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap" role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="production" aria-selected="false">Production</button>
+    <button role="tab" data-tab="materials" aria-selected="false">Materials</button>
+    <button role="tab" data-tab="assembly" aria-selected="false">Assembly</button>
+    <span class="spacer"></span>
+    <button role="tab" data-tab="record" aria-selected="false" class="rec">+ Record</button>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="banner" id="banner" role="alert"></div>
+
+  <section class="filters" id="filters" aria-label="Filters">
+    <label class="field product"><span>Product</span><select id="fProduct"><option value="">All products</option></select></label>
+    <label class="field" data-for="overview"><span>Risk</span>
+      <select id="fRisk">
+        <option value="">All statuses</option><option value="critical">Critical</option>
+        <option value="at_risk">At risk</option><option value="on_track">On track</option>
+        <option value="na">No plan in period</option>
+      </select></label>
+    <label class="field" data-for="overview"><span>Department</span>
+      <select id="fStage"><option value="chassis">Chassis</option><option value="foam">Foam</option><option value="assembly">Assembly</option></select></label>
+    <label class="field" data-for="overview"><span>Period</span><select id="fPeriod"></select></label>
+    <div class="custom-range" id="customRange" data-for="overview">
+      <label class="field"><span>From</span><input type="date" id="fFrom"></label>
+      <label class="field"><span>To</span><input type="date" id="fTo"></label>
+    </div>
+    <label class="field"><span>As of</span><input type="date" id="fAsOf"></label>
+    <button class="linkbtn" id="resetBtn" type="button">Reset filters</button>
+    <span class="inview" id="inView"></span>
+  </section>
+
+  <!-- OVERVIEW -->
+  <section data-view="overview">
+    <div class="cards">
+      <article class="card"><h3>Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
+      <article class="card amber"><h3 id="cStageTitle">Period output</h3><div class="metric" id="cStage">—</div><div class="sub" id="cStageSub"></div></article>
+      <article class="card amber"><h3>Assembly completed</h3><div class="metric" id="cAsm">—</div><div class="sub" id="cAsmSub"></div></article>
+      <article class="card red"><h3>Critical models</h3><div class="metric" id="cCrit">—</div><div class="sub" id="cCritSub"></div></article>
+    </div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow">Client delivery · whole contract</div><h2>Delivery status against the schedule</h2></div>
+        <div class="legend"><span><i style="background:var(--target)"></i>Planned</span><span><i style="background:var(--teal)"></i>Delivered</span><span><i style="background:var(--orange)"></i>Cumulative backlog</span></div></div>
+      <div class="kpis" id="dKpis"></div>
+      <div id="dTimeline"></div>
+      <div class="tbl-wrap section"><table id="dStatusTbl"></table></div>
+    </article>
+    <div class="grid2">
+      <article class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow" id="execEyebrow">Execution</div><h2>Target vs completed</h2></div>
+          <div class="legend"><span><i style="background:var(--target)"></i>Target</span><span><i style="background:var(--teal)"></i>Completed</span></div>
+        </div>
+        <div class="bars" id="bars"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-head">
+          <div><div class="eyebrow">Risk concentration</div><h2>Execution readiness</h2></div>
+          <span class="pill critical" id="critPill">0 critical</span>
+        </div>
+        <div class="ready">
+          <div class="donut" title="Volume-weighted schedule attainment: Σ target × min(1, completed ÷ plan due to date) ÷ Σ target">
+            <svg width="200" height="200" viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx="100" cy="100" r="82" fill="none" stroke="#e8edf1" stroke-width="22"/>
+              <circle id="donutArc" cx="100" cy="100" r="82" fill="none" stroke="var(--teal)" stroke-width="22" stroke-dasharray="0 516"/>
+            </svg>
+            <div class="c"><b id="readyPct">—</b><span>weighted readiness</span></div>
+          </div>
+          <ul class="kv">
+            <li><span>Models approved</span><b id="kApproved">—</b></li>
+            <li><span>Models with output</span><b id="kOutput">—</b></li>
+            <li><span>Material at zero</span><b id="kMatZero">—</b></li>
+          </ul>
+        </div>
+        <div class="insight" id="insight"></div>
+      </article>
+    </div>
+    <article class="panel">
+      <div class="panel-head"><div><div class="eyebrow">Product status</div><h2>Where each model stands</h2></div></div>
+      <div class="tbl-wrap"><table id="statusTbl"></table></div>
+    </article>
+  </section>
+
+  <!-- PRODUCTION -->
+  <section data-view="production" hidden>
+    <div class="chips" id="prodDept"></div>
+    <div class="cards" id="prodCards"></div>
+    <article class="panel">
+      <div class="panel-head"><div><div class="eyebrow">Department flow</div><h2>Output, WIP and what assembly can start</h2></div>
+        <span class="hint">Cumulative to the As-of date</span></div>
+      <div class="flowmap"><b>Chassis / welding</b>+<b>Foam injection</b>→<b>Assembly / upholstery</b>→<b>Client</b>
+        <span>· Kintra ships from chassis, Zahida from foam</span></div>
+      <div class="tbl-wrap"><table class="flow" id="flowTbl"></table></div>
+      <p class="hint">WIP = department output not yet consumed by assembly (1 set per chair). Ready to assemble = min(chassis, foam output) − assembled. Negative WIP means assembly recorded more than the department produced — check the entries.</p>
+    </article>
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Cumulative output</div><h2>Stage progress by model</h2></div>
+        <span class="hint">Select a row to see part-level progress</span></div>
+      <div class="tbl-wrap"><table id="matrixTbl"></table></div>
+    </article>
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent production entries</h2></div></div>
+      <div class="tbl-wrap"><table id="prodLog"></table></div>
+    </article>
+  </section>
+
+  <!-- MATERIALS -->
+  <section data-view="materials" hidden>
+    <div class="cards">
+      <article class="card red"><h3>Shortfall to date</h3><div class="metric" id="mShortPct">—</div><div class="sub" id="mShortSub"></div></article>
+      <article class="card red"><h3>At zero stock</h3><div class="metric" id="mZero">—</div><div class="sub">Requirement remaining, nothing on hand</div></article>
+      <article class="card amber"><h3>Short</h3><div class="metric" id="mShort">—</div><div class="sub">On hand below remaining need</div></article>
+      <article class="card"><h3>Covered / complete</h3><div class="metric" id="mCovered">—</div><div class="sub" id="mCoveredSub"></div></article>
+    </div>
+    <article class="panel">
+      <div class="panel-head"><div><div class="eyebrow">Stock vs requirement</div><h2>Material coverage</h2></div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:10px">
+          <span style="white-space:nowrap">Lead time (days)</span>
+          <input type="number" id="mLead" min="0" max="120" step="1" value="0" style="width:90px;min-height:42px" title="Material needed this many days before the client delivery slot">
+        </label></div>
+      <div class="chips" id="deptChips"></div>
+      <div class="chips" id="matChips"></div>
+      <div class="tbl-wrap"><table id="matTbl"></table></div>
+      <p class="hint">On hand = receipts − issues ± adjustments. Theoretical use = planned qty × (units completed ÷ department plan). Remaining need = planned − theoretical use.<br>
+      Required to date = planned qty × (units due by the status date ÷ department plan), taken from the client delivery schedule. Shortfall = required to date − (receipts ± adjustments); the % is of that date requirement, not of the whole project.</p>
+    </article>
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent material movements</h2></div></div>
+      <div class="tbl-wrap"><table id="matLog"></table></div>
+    </article>
+  </section>
+
+  <!-- ASSEMBLY -->
+  <section data-view="assembly" hidden>
+    <div class="cards three">
+      <article class="card"><h3>Assembly completed</h3><div class="metric" id="aDone">—</div><div class="sub" id="aDoneSub"></div></article>
+      <article class="card amber"><h3>Delivered to client</h3><div class="metric" id="aDel">—</div><div class="sub" id="aDelSub"></div></article>
+      <article class="card red"><h3>Delivery backlog</h3><div class="metric" id="aBack">—</div><div class="sub" id="aBackSub"></div></article>
+    </div>
+    <article class="panel">
+      <div class="panel-head"><div><div class="eyebrow">Client delivery plan</div><h2>Delivered vs plan by period</h2></div>
+        <span class="hint">Cells show delivered / planned. Red: closed period below plan.</span></div>
+      <div class="tbl-wrap"><table class="dm" id="dmTbl"></table></div>
+    </article>
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent client deliveries</h2></div></div>
+      <div class="tbl-wrap"><table id="delLog"></table></div>
+    </article>
+  </section>
+
+  <!-- RECORD -->
+  <section data-view="record" hidden>
+    <div class="recbar"><span>Department</span><div class="chips" id="recDept"></div>
+      <span class="hint" id="recDeptHint"></span></div>
+    <div class="forms">
+      <form class="panel" id="formProd" autocomplete="off">
+        <div><div class="eyebrow">Production</div><h2>Record output</h2></div>
+        <div class="row2">
+          <label class="field"><span>Date</span><input type="date" name="entry_date" required></label>
+          <label class="field"><span>Shift</span><select name="shift"><option value="">—</option><option>A</option><option>B</option><option>C</option></select></label>
+        </div>
+        <label class="field"><span>Product</span><select name="product_id" required></select></label>
+        <div class="row2">
+          <label class="field"><span>Department</span><select name="stage" required></select></label>
+          <label class="field"><span>Part</span><select name="component_id"></select></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>Good qty</span><input type="number" name="qty" min="1" step="1" required inputmode="numeric"></label>
+          <label class="field"><span>Scrap qty</span><input type="number" name="scrap_qty" min="0" step="1" value="0" inputmode="numeric"></label>
+        </div>
+        <label class="field"><span>Recorded by</span><input type="text" name="recorded_by" data-remember></label>
+        <label class="field"><span>Note</span><input type="text" name="note"></label>
+        <p class="hint" id="prodHint"></p>
+        <button class="btn" type="submit">Record output</button>
+      </form>
+
+      <form class="panel" id="formDel" autocomplete="off">
+        <div><div class="eyebrow">Client delivery</div><h2>Record delivery</h2></div>
+        <label class="field"><span>Date</span><input type="date" name="delivery_date" required></label>
+        <label class="field"><span>Product</span><select name="product_id" required></select></label>
+        <div class="row2">
+          <label class="field"><span>Qty delivered</span><input type="number" name="qty" min="1" step="1" required inputmode="numeric"></label>
+          <label class="field"><span>Delivery note no.</span><input type="text" name="delivery_note"></label>
+        </div>
+        <label class="field"><span>Recorded by</span><input type="text" name="recorded_by" data-remember></label>
+        <label class="field"><span>Note</span><input type="text" name="note"></label>
+        <p class="hint" id="delHint"></p>
+        <button class="btn" type="submit">Record delivery</button>
+      </form>
+
+      <form class="panel" id="formMat" autocomplete="off">
+        <div><div class="eyebrow">Materials</div><h2>Record movement</h2></div>
+        <div class="row2">
+          <label class="field"><span>Date</span><input type="date" name="txn_date" required></label>
+          <label class="field"><span>Type</span><select name="txn_type" required>
+            <option value="receipt">Receipt</option><option value="issue">Issue to production</option><option value="adjust">Stock adjustment (±)</option></select></label>
+        </div>
+        <label class="field"><span>Material</span><select name="material_id" required></select></label>
+        <div class="row2">
+          <label class="field"><span>Qty</span><input type="number" name="qty" step="any" required></label>
+          <label class="field"><span>For product</span><select name="product_id"><option value="">—</option></select></label>
+        </div>
+        <label class="field"><span>Reference (GRN / issue slip)</span><input type="text" name="reference"></label>
+        <label class="field"><span>Recorded by</span><input type="text" name="recorded_by" data-remember></label>
+        <p class="hint" id="matHint">Use a positive adjustment dated before the first issue for opening stock.</p>
+        <button class="btn" type="submit">Record movement</button>
+      </form>
+    </div>
+
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Admin</div><h2>Model approval</h2></div><span class="hint">Changes require the admin PIN</span></div>
+      <div class="tbl-wrap"><table id="apprTbl"></table></div>
+    </article>
+
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Admin</div><h2>Import plan from Excel</h2></div></div>
+      <p class="muted" style="margin-top:0">Upload a revised <span class="ar">جدول توريدات Kayan</span> workbook. Products, stage quantities, parts, bill of materials and the delivery schedule are replaced; recorded production, deliveries, stock movements and approvals are kept.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <input type="file" id="importFile" accept=".xlsx,.xls">
+        <button class="btn" id="importBtn" type="button" disabled>Import plan</button>
+      </div>
+      <div id="importPreview" class="section" hidden></div>
+    </article>
+
+    <article class="panel section">
+      <div class="panel-head"><div><div class="eyebrow">Admin</div><h2>Connection &amp; PIN</h2></div></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn secondary" id="connBtn" type="button">Change Supabase connection</button>
+        <button class="btn secondary" id="pinBtn" type="button">Change admin PIN</button>
+      </div>
+    </article>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dlg"><form method="dialog" class="panel" id="dlgForm">
+  <h2 id="dlgTitle" style="margin-top:0"></h2>
+  <div id="dlgBody"></div>
+  <div class="actions"><button class="btn secondary" value="cancel" formnovalidate>Cancel</button><button class="btn" value="ok" id="dlgOk">Confirm</button></div>
+</form></dialog>
+
+<script id="kayan-parser">
+/* KAYAN plan parser — turns the "جدول توريدات Kayan" workbook into the
+ * payload accepted by kayan_ingest_plan(). Pure function, no DOM.
+ * Every normalisation below is guarded: if the workbook no longer matches
+ * the expected numbers, the rule is skipped and a warning is returned. */
+function parseKayanWorkbook(wb, XLSX, sourceFile) {
+  const warnings = [];
+  const EN = { 1: 'Kintra', 2: 'Pasport U', 3: 'Babar arm', 4: 'Babar lecture', 5: 'Pasport 4-leg',
+    6: 'Estacabol', 7: 'Lush', 8: 'New CABO Manager', 9: 'New CABO Employee', 10: 'Spanish',
+    11: 'Lab stool', 12: 'Zahida' };
+  // Products whose shared components/materials were entered as one pooled line.
+  // keywords route a line to one product; an unrouted line whose qty equals the
+  // group's summed product qty is split by product qty.
+  const POOLS = [
+    { products: [2, 5], keywords: {} },
+    { products: [8, 9], keywords: { 8: 'مدير', 9: 'موظف' } },
+  ];
+  // Lush has no chassis line in the finished-goods sheet; its chassis qty sits in
+  // the raw-materials sheet (column D, no description).
+  const EXTRA_STAGES = [{ product: 7, stage: 'chassis', name_ar: 'شاسيه كرسي لاش', from: 'materials_chassis_blank' }];
+
+  const num = v => (typeof v === 'number' && isFinite(v)) ? v
+    : (typeof v === 'string' && /^\s*\d+(\.\d+)?\s*$/.test(v)) ? Number(v) : null;
+  const txt = v => (v == null ? '' : String(v)).replace(/\s+/g, ' ').trim();
+  const sheet = (name, idx) => {
+    const ws = wb.Sheets[name] || wb.Sheets[wb.SheetNames[idx]];
+    if (!ws) throw new Error(`Sheet "${name}" not found`);
+    return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, range: 'A1:P300', blankrows: true });
+  };
+  const grouped = (rows, firstRow) => {       // [{id, name_ar, rows:[...]}]
+    const out = []; let cur = null;
+    for (let i = firstRow; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const line = num(r[0]);
+      if (line != null && Number.isInteger(line) && line > 0) {
+        cur = { id: line, name_ar: txt(r[1]), rows: [] }; out.push(cur);
+      }
+      if (cur) cur.rows.push(r);
+    }
+    return out;
+  };
+
+  // ---- Delivery sheet (التوريد): products, contract qty, bi-weekly plan ----
+  const del = sheet('التوريد', 2);
+  const hdr = del[2] || [];
+  const periods = [];
+  const parseD = s => { const m = String(s).trim().match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
+    if (!m) return null; const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    return new Date(Date.UTC(y, +m[2] - 1, +m[1])); };
+  const iso = d => d.toISOString().slice(0, 10);
+  for (let c = 4; c < hdr.length; c++) {
+    if (!hdr[c]) continue;
+    const [a, b] = String(hdr[c]).split('/');
+    let s = parseD(a), e = parseD(b);
+    if (!s || !e) { warnings.push(`Delivery header column ${c + 1}: cannot read period "${hdr[c]}"`); continue; }
+    const prev = periods[periods.length - 1];
+    if (prev && s <= prev.e) {
+      const fixed = new Date(prev.e.getTime() + 86400000);
+      warnings.push(`Period "${hdr[c]}" overlaps previous period; start moved to ${iso(fixed)}`);
+      s = fixed;
+    }
+    periods.push({ col: c, s, e });
+  }
+  const products = new Map();
+  for (const g of grouped(del, 3)) {
+    const r = g.rows[0];
+    const total = num(r[3]) || 0;
+    const delivery = [];
+    let sum = 0;
+    for (const p of periods) {
+      const v = r[p.col];
+      const q = num(v);
+      if (q) { delivery.push({ period_start: iso(p.s), period_end: iso(p.e), qty: q }); sum += q; }
+      else if (v != null && txt(v)) delivery.push({ period_start: iso(p.s), period_end: iso(p.e), qty: 0, note: txt(v) });
+    }
+    if (sum !== total) warnings.push(`${EN[g.id] || g.id}: delivery periods sum ${sum} ≠ total ${total}`);
+    products.set(g.id, { id: g.id, name_en: EN[g.id] || g.name_ar, name_ar: g.name_ar, total_qty: total,
+      comps: { chassis: [], foam: [] }, assembly: null, requirements: [], delivery });
+  }
+  const grand = del.slice(3).map(r => r && r[0] == null ? num(r[3]) : null).filter(v => v != null).pop();
+  const sumTotals = [...products.values()].reduce((a, p) => a + p.total_qty, 0);
+  if (grand != null && grand !== sumTotals) warnings.push(`Delivery sheet grand total ${grand} ≠ sum of products ${sumTotals}`);
+
+  // ---- Finished-goods sheet (المنتج التام): stage components ----
+  const fin = sheet('المنتج التام', 0);
+  for (const g of grouped(fin, 3)) {
+    const P = products.get(g.id);
+    if (!P) { warnings.push(`Finished sheet line ${g.id} not in delivery sheet — skipped`); continue; }
+    for (const r of g.rows) {
+      if (num(r[3])) P.comps.chassis.push({ name_ar: txt(r[4]) || P.name_ar, planned_qty: num(r[3]) });
+      if (num(r[5])) P.comps.foam.push({ name_ar: txt(r[6]) || P.name_ar, planned_qty: num(r[5]) });
+      if (num(r[7])) P.assembly = { planned_qty: num(r[7]), label: txt(r[8]) || null };
+    }
+  }
+
+  // ---- Raw-materials sheet (الخامات): BOM totals ----
+  const mat = sheet('الخامات', 1);
+  const chassisBlank = new Map();
+  for (const g of grouped(mat, 3)) {
+    const P = products.get(g.id);
+    if (!P) { warnings.push(`Materials sheet line ${g.id} not in delivery sheet — skipped`); continue; }
+    for (const r of g.rows) {
+      if (num(r[3])) {
+        if (txt(r[4])) P.requirements.push({ stage: 'chassis', material: txt(r[4]), planned_qty: num(r[3]) });
+        else chassisBlank.set(g.id, num(r[3]));
+      }
+      if (num(r[5]) && txt(r[6])) P.requirements.push({ stage: 'foam', material: txt(r[6]), planned_qty: num(r[5]) });
+    }
+  }
+
+  // ---- Normalisation 1: extra stages ----
+  for (const x of EXTRA_STAGES) {
+    const P = products.get(x.product);
+    const q = chassisBlank.get(x.product);
+    if (P && q === P.total_qty && P.comps[x.stage].length === 0) {
+      P.comps[x.stage].push({ name_ar: x.name_ar, planned_qty: q });
+      warnings.push(`${P.name_en}: ${x.stage} stage added from raw-materials sheet (qty ${q})`);
+    } else if (P) warnings.push(`${P.name_en}: expected ${x.stage} qty in raw-materials sheet not found — stage not added`);
+  }
+
+  // ---- Normalisation 2: pooled lines ----
+  const splitPool = (pool, getList, label) => {
+    const members = pool.products.map(id => products.get(id)).filter(Boolean);
+    if (members.length !== pool.products.length) return;
+    const poolQty = members.reduce((a, p) => a + p.total_qty, 0);
+    const moved = [];
+    for (const P of members) {
+      for (const item of [...getList(P)]) {
+        const name = item.name_ar || item.material;
+        const routeTo = Object.entries(pool.keywords).find(([, kw]) => name.includes(kw));
+        if (routeTo && +routeTo[0] !== P.id) {
+          const T = products.get(+routeTo[0]);
+          getList(P).splice(getList(P).indexOf(item), 1); getList(T).push(item);
+          moved.push(`"${name}" → ${T.name_en}`);
+        } else if (!routeTo && item.planned_qty === poolQty) {
+          getList(P).splice(getList(P).indexOf(item), 1);
+          for (const T of members) getList(T).push({ ...item, planned_qty: T.total_qty });
+          moved.push(`"${name}" ${poolQty} split ${members.map(m => `${m.name_en} ${m.total_qty}`).join(' / ')}`);
+        }
+      }
+    }
+    if (moved.length) warnings.push(`${label}: ${moved.join('; ')}`);
+  };
+  for (const pool of POOLS) {
+    for (const st of ['chassis', 'foam']) splitPool(pool, P => P.comps[st], `Components (${st})`);
+    splitPool(pool, P => P.requirements, 'Materials');
+  }
+
+  // ---- Build payload ----
+  const out = [];
+  for (const P of [...products.values()].sort((a, b) => a.id - b.id)) {
+    const stages = [];
+    for (const st of ['chassis', 'foam']) {
+      const comps = P.comps[st];
+      if (!comps.length) continue;
+      const planned = Math.min(...comps.map(c => c.planned_qty));
+      if (planned !== P.total_qty) warnings.push(`${P.name_en}: ${st} planned ${planned} ≠ contract qty ${P.total_qty}`);
+      stages.push({ stage: st, planned_qty: planned, label: null,
+        components: comps.map((c, i) => ({ name_ar: c.name_ar, planned_qty: c.planned_qty,
+          qty_per_unit: Math.round(c.planned_qty / planned * 10000) / 10000, sort: i + 1 })) });
+    }
+    if (P.assembly) {
+      if (P.assembly.planned_qty !== P.total_qty) warnings.push(`${P.name_en}: assembly planned ${P.assembly.planned_qty} ≠ contract qty ${P.total_qty}`);
+      stages.push({ stage: 'assembly', planned_qty: P.assembly.planned_qty, label: P.assembly.label, components: [] });
+    }
+    if (!stages.length) warnings.push(`${P.name_en}: no production stages found`);
+    out.push({ id: P.id, name_en: P.name_en, name_ar: P.name_ar, total_qty: P.total_qty,
+      stages, requirements: P.requirements, delivery: P.delivery });
+  }
+  return { source_file: sourceFile || null, parsed_at: new Date().toISOString(), products: out, warnings };
+}
+if (typeof module !== 'undefined') module.exports = { parseKayanWorkbook };
+
+</script>
+<script>
+'use strict';
+/* ====================== configuration ====================== */
+const DEFAULT_URL = 'https://rvlnsfubdukwcoauwayu.supabase.co';
+const DEFAULT_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2bG5zZnViZHVrd2NvYXV3YXl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMTM1ODUsImV4cCI6MjEwNTU4OTU4NX0.TuwlCUJKU2Kb71iCKc7NjKqC165hMvwyaWquCSsNa4A';   // anon (public) key — safe to ship; writes limited by RLS
+const LS = { url: 'kayan.sb.url', key: 'kayan.sb.key', by: 'kayan.recordedBy' };
+
+/* ====================== helpers ====================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const NF = new Intl.NumberFormat('en-US');
+const fmt = n => n == null ? '—' : NF.format(Math.round(n));
+const fmt2 = n => n == null ? '—' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n);
+const pct = (x, d = 1) => x == null ? 'N/A' : (x * 100).toFixed(d) + '%';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const localISO = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const dshort = s => { const d = parseISO(s); return `${d.getDate()} ${MON[d.getMonth()]}`; };
+const dlong = s => { const d = parseISO(s); return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`; };
+const lastDay = (y, m) => new Date(y, m + 1, 0).getDate();
+const STAGE = { chassis: 'Chassis', foam: 'Foam', assembly: 'Assembly' };   // = departments: welding, foam injection, assembly/upholstery
+const RISK = { critical: 'Critical', at_risk: 'At risk', on_track: 'On track', na: 'No plan in period' };
+const MSTAT = { zero: 'At zero', short: 'Short', covered: 'Covered', complete: 'Complete' };
+
+function toast(msg, err = false) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : '');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.className = 'toast', err ? 5000 : 2600);
+}
+function banner(msg) { const b = $('#banner'); b.textContent = msg || ''; b.classList.toggle('on', !!msg); }
+function errMsg(e) { return e?.message || e?.error_description || String(e); }
+
+function dialog({ title, html, ok = 'Confirm', onOpen }) {
+  return new Promise(res => {
+    const d = $('#dlg'); $('#dlgTitle').textContent = title; $('#dlgBody').innerHTML = html; $('#dlgOk').textContent = ok;
+    d.onclose = () => res(d.returnValue === 'ok' ? d : null);
+    d.returnValue = ''; d.showModal(); onOpen && onOpen(d);
+  });
+}
+let sessionPin = null;
+async function askPin(purpose) {
+  if (sessionPin) return sessionPin;
+  const d = await dialog({ title: 'Admin PIN', ok: 'Continue',
+    html: `<p class="muted">${esc(purpose)}</p><label class="field"><span>PIN</span><input type="password" id="pinInput" autocomplete="current-password" required></label>`,
+    onOpen: () => setTimeout(() => $('#pinInput').focus(), 30) });
+  if (!d) return null;
+  return $('#pinInput').value;
+}
+async function withPin(purpose, fn) {
+  const pin = await askPin(purpose);
+  if (!pin) return false;
+  try { await fn(pin); sessionPin = pin; return true; }
+  catch (e) { if (/PIN/i.test(errMsg(e))) sessionPin = null; toast(errMsg(e), true); return false; }
+}
+
+/* ====================== state ====================== */
+const S = {
+  tab: 'overview', stage: 'chassis', period: null, from: null, to: null, asOf: localISO(),
+  product: '', risk: '', matStatus: '', matDept: '', matLead: 0, prodDept: '', recDept: localStorage.getItem('kayan.recDept') || '',
+  ref: { products: [], stages: [], components: [], materials: [], periods: [] },
+  dash: null, matrix: null, matStatus_: null, dm: null,
+};
+let sb = null;
+
+/* ====================== data access ====================== */
+async function q(p) { const { data, error } = await p; if (error) throw error; return data; }
+async function rpc(name, args) { return q(sb.rpc(name, args)); }
+async function fetchAll(table, order) {
+  const out = []; const size = 1000;
+  for (let i = 0; ; i += size) {
+    const rows = await q(sb.from(table).select('*').order(order, { ascending: true }).range(i, i + size - 1));
+    out.push(...rows); if (rows.length < size) break;
+  }
+  return out;
+}
+async function loadRef() {
+  const [products, stages, components, materials, plan, reqs] = await Promise.all([
+    q(sb.from('kayan_products').select('*').order('id')),
+    q(sb.from('kayan_product_stages').select('*').gt('planned_qty', 0)),
+    q(sb.from('kayan_components').select('*').eq('active', true).order('sort')),
+    q(sb.from('kayan_materials').select('*').order('name_ar')),
+    q(sb.from('kayan_delivery_plan').select('period_start,period_end')),
+    q(sb.from('kayan_material_requirements').select('product_id,stage,material_id')),
+  ]);
+  const seen = new Map(); plan.forEach(p => seen.set(p.period_start, p.period_end));
+  const periods = [...seen].map(([s, e]) => ({ s, e })).sort((a, b) => a.s.localeCompare(b.s));
+  S.ref = { products, stages, components, materials, periods, reqs };
+  if (!products.length) banner('No plan loaded yet. Run sql/02_seed.sql or import the Excel plan from the Record tab.');
+  buildSelects();
+}
+
+/* ====================== filters ====================== */
+function periodOptions() {
+  const P = S.ref.periods; const opts = [];
+  if (!P.length) return [{ key: 'custom', label: 'Custom range…' }];
+  const months = [...new Set(P.map(p => p.s.slice(0, 7)))];
+  months.forEach(m => { const [y, mm] = m.split('-').map(Number);
+    opts.push({ key: 'm:' + m, label: `${MONTH[mm - 1]} ${y}`, from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}`, short: MONTH[mm - 1] }); });
+  P.forEach(p => opts.push({ key: 'p:' + p.s, label: `${dshort(p.s)} – ${dshort(p.e)}`, from: p.s, to: p.e, short: `${dshort(p.s)}–${dshort(p.e)}` }));
+  opts.push({ key: 'all', label: 'Whole plan', from: P[0].s, to: P[P.length - 1].e, short: 'Whole-plan' });
+  opts.push({ key: 'custom', label: 'Custom range…' });
+  return opts;
+}
+function defaultPeriodKey(opts) {
+  if (opts.some(o => o.key === 'all')) return 'all';
+  const m = 'm:' + S.asOf.slice(0, 7);
+  if (opts.some(o => o.key === m)) return m;
+  const next = opts.find(o => o.key.startsWith('m:') && o.from > S.asOf);
+  return next ? next.key : (opts.filter(o => o.key.startsWith('m:')).pop() || opts[0]).key;
+}
+function applyPeriod() {
+  const o = periodOptions().find(x => x.key === S.period);
+  if (o && o.key !== 'custom') { S.from = o.from; S.to = o.to; }
+  $('#customRange').classList.toggle('on', S.period === 'custom');
+  $('#fFrom').value = S.from || ''; $('#fTo').value = S.to || '';
+}
+function periodShort() {
+  const o = periodOptions().find(x => x.key === S.period);
+  return o && o.short ? o.short : `${dshort(S.from)}–${dshort(S.to)}`;
+}
+function buildSelects() {
+  const P = S.ref.products;
+  const cur = $('#fProduct').value;
+  $('#fProduct').innerHTML = '<option value="">All products</option>' +
+    P.map(p => `<option value="${p.id}">${esc(p.name_en)}</option>`).join('');
+  $('#fProduct').value = cur;
+  const opts = periodOptions();
+  if (!S.period || !opts.some(o => o.key === S.period)) S.period = defaultPeriodKey(opts);
+  $('#fPeriod').innerHTML = opts.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
+  $('#fPeriod').value = S.period; applyPeriod();
+  buildRecordForms();
+  syncProdForm();
+}
+function readFilters() {
+  S.product = $('#fProduct').value; S.risk = $('#fRisk').value; S.stage = $('#fStage').value;
+  S.period = $('#fPeriod').value; S.asOf = $('#fAsOf').value || localISO();
+  if (S.period === 'custom') { S.from = $('#fFrom').value || S.from; S.to = $('#fTo').value || S.to; }
+  applyPeriod();
+}
+function productIds() { return S.product ? [Number(S.product)] : null; }
+const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
+
+/* ====================== rendering: overview ====================== */
+async function loadOverview() {
+  if (!S.from || !S.to || S.to < S.from) { banner('Choose a valid period (To must be on or after From).'); return; }
+  const [dash, ds, dm] = await Promise.all([
+    rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: S.asOf,
+      p_product_ids: productIds(), p_risk: S.risk || null }),
+    rpc('kayan_delivery_status', { p_as_of: S.asOf }),
+    rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
+  ]);
+  S.dash = dash; S.dstat = ds; S.dm = dm;
+  renderOverview(); renderDeliveryStatus();
+}
+function renderOverview() {
+  const D = S.dash; if (!D) return;
+  const sm = D.summary, pr = D.project, stg = STAGE[S.stage];
+  $('#dataThrough').textContent = D.data_through ? dlong(D.data_through) : 'No entries yet';
+  $('#inView').textContent = `${sm.in_view} ${stg.toLowerCase()} product${sm.in_view === 1 ? '' : 's'} in view`;
+  $('#cScope').textContent = fmt(pr.scope);
+  $('#cScopeSub').innerHTML = `${pr.products} product${pr.products === 1 ? '' : 's'} · ${S.product ? 'selected' : 'full order'}<br>Delivered to client: ${fmt(pr.delivered)} (${pct(pr.scope ? pr.delivered / pr.scope : null)})`;
+  $('#cStageTitle').textContent = `${periodShort()} ${stg.toLowerCase()}`;
+  $('#cStage').innerHTML = `${fmt(sm.done)} <small>/</small> ${fmt(sm.target)}`;
+  $('#cStageSub').textContent = sm.target ? `${pct(sm.achievement)} achieved · ${fmt(sm.due)} due to date` : 'No plan quantity in this period';
+  $('#cAsm').innerHTML = `${fmt(D.assembly.done)} <small>/</small> ${fmt(D.assembly.scope)}`;
+  $('#cAsmSub').textContent = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
+  $('#cCrit').textContent = sm.critical;
+  $('#cCritSub').textContent = `${sm.in_view} model${sm.in_view === 1 ? '' : 's'} in current view`;
+  $('#execEyebrow').textContent = `${periodShort()} execution`;
+
+  const rows = D.products;
+  const max = Math.max(1, ...rows.map(r => Math.max(r.target, r.done)));
+  $('#bars').innerHTML = rows.length ? rows.map(r => `
+    <div class="name" title="${esc(r.name_ar)}"><i class="rdot ${r.risk}" title="${RISK[r.risk]}"></i><span>${esc(r.name_en)}</span></div>
+    <div class="bar" role="img" aria-label="${esc(r.name_en)}: ${fmt(r.done)} of ${fmt(r.target)}">
+      <div class="t" style="width:${(r.target / max * 100).toFixed(2)}%"></div>
+      <div class="d" style="width:${(r.done / max * 100).toFixed(2)}%"></div></div>
+    <div class="pct ${r.target ? '' : 'na'}">${r.target ? pct(r.achievement) : 'N/A'}</div>`).join('')
+    : `<div class="empty-state" style="grid-column:1/-1">No products match the current filters.</div>`;
+
+  $('#critPill').textContent = `${sm.critical} critical`;
+  const wr = sm.weighted_readiness; const C = 2 * Math.PI * 82;
+  $('#donutArc').setAttribute('stroke-dasharray', `${(wr || 0) * C} ${C}`);
+  $('#readyPct').textContent = wr == null ? 'N/A' : pct(wr);
+  $('#kApproved').textContent = `${sm.approved}/${sm.in_view}`;
+  $('#kOutput').textContent = `${sm.with_output}/${sm.in_view}`;
+  $('#kMatZero').textContent = sm.material_zero;
+  $('#insight').textContent = insightText(D);
+
+  $('#statusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Target</th><th class="n">Due to date</th><th class="n">Completed</th>
+    <th class="n">Achieved</th><th class="n">Pace</th><th>${stg} cumulative</th><th class="n">Delivered</th><th>Risk</th><th>Drivers</th></tr></thead><tbody>` +
+    (rows.map(r => `<tr>
+      <td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>
+      <td class="n">${fmt(r.target)}</td><td class="n">${fmt(r.due)}</td><td class="n">${fmt(r.done)}</td>
+      <td class="n">${r.target ? pct(r.achievement) : 'N/A'}</td><td class="n">${r.due ? pct(r.pace) : '—'}</td>
+      <td>${mini(r.stage_done_cum, r.stage_scope)}</td>
+      <td class="n">${fmt(r.delivered_cum)}</td>
+      <td><span class="pill ${r.risk}">${RISK[r.risk]}</span></td>
+      <td class="reasons">${reasonText(r)}</td></tr>`).join('') ||
+      '<tr><td colspan="10" class="empty-state">No products match the current filters.</td></tr>') + '</tbody>';
+}
+const DSTAT = { complete: 'Complete', na: 'Not due yet', on_track: 'On schedule', at_risk: 'Slightly behind', critical: 'Behind' };
+function renderDeliveryStatus() {
+  const pids = productIds();
+  const rows = S.dstat.filter(r => !pids || pids.includes(r.product_id));
+  const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const contract = sum('contract'), due = sum('due'), del = sum('delivered'), back = sum('backlog'), uns = sum('unscheduled');
+  $('#dKpis').innerHTML = `
+    <div><span>Contract</span><b>${fmt(contract)}</b><small>${rows.length} product${rows.length === 1 ? '' : 's'}</small></div>
+    <div><span>Plan due by ${dshort(S.asOf)}</span><b>${fmt(due)}</b><small>${pct(contract ? due / contract : null)} of contract</small></div>
+    <div><span>Delivered</span><b>${fmt(del)}</b><small>${pct(due ? del / due : null)} of due · ${pct(contract ? del / contract : null)} of contract</small></div>
+    <div class="${back ? 'bad' : ''}"><span>Backlog</span><b>${fmt(back)}</b><small>${rows.filter(r => r.backlog > 0).length} product${rows.filter(r => r.backlog > 0).length === 1 ? '' : 's'} behind</small></div>
+    <div class="${uns ? 'bad' : ''}"><span>Unscheduled</span><b>${fmt(uns)}</b><small>${uns ? rows.filter(r => r.unscheduled).map(r => r.name_en).join(', ') : 'All scheduled'}</small></div>`;
+
+  // timeline: planned vs delivered per bi-weekly period, cumulative gap line
+  const P = S.ref.periods;
+  const per = P.map(p => { const m = S.dm.filter(r => r.period_start === p.s && (!pids || pids.includes(r.product_id)));
+    return { ...p, plan: m.reduce((a, r) => a + r.planned, 0), del: m.reduce((a, r) => a + r.delivered, 0) }; });
+  // gap = plan due up to min(period end, as-of) − delivered; the current period is pro-rated to the as-of date,
+  // so the last gap point equals the Backlog KPI.
+  const days = (a, b) => (parseISO(b) - parseISO(a)) / 864e5 + 1;
+  let cp = 0, cd = 0;
+  per.forEach(p => {
+    const dueHere = p.e <= S.asOf ? p.plan : p.s <= S.asOf ? p.plan * days(p.s, S.asOf) / days(p.s, p.e) : 0;
+    cp += dueHere; cd += p.del; p.gap = p.s <= S.asOf ? Math.max(0, Math.round(cp - cd)) : null;
+    if (p.s <= S.asOf && p.e >= S.asOf) p.gap = Math.max(0, due - del);   // same basis as the KPIs (server-rounded)
+  });
+  const W = 1000, H = 230, L = 10, R = 10, T = 26, B = 46, cw = (W - L - R) / Math.max(1, per.length);
+  const max = Math.max(1, ...per.map(p => Math.max(p.plan, p.del, p.gap || 0)));
+  const y = v => T + (H - T - B) * (1 - v / max), gy = y;
+  const bw = Math.min(46, cw * 0.32);
+  let svg = `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planned versus delivered by delivery period">`;
+  per.forEach((p, i) => {
+    const x = L + i * cw + cw / 2, now = p.s <= S.asOf && p.e >= S.asOf;
+    if (now) svg += `<rect x="${L + i * cw}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#fff7e6"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:#a8700b;font-weight:800">today</text>`;
+    svg += `<rect x="${x - bw - 2}" y="${y(p.plan)}" width="${bw}" height="${H - B - y(p.plan)}" rx="3" fill="#cfd9e1"/>`;
+    if (p.s <= S.asOf) svg += `<rect x="${x + 2}" y="${y(p.del)}" width="${bw}" height="${H - B - y(p.del)}" rx="3" fill="#2a9fc9"/>`;
+    svg += `<text class="v" x="${x - bw / 2 - 2}" y="${y(p.plan) - 5}" text-anchor="middle">${fmt(p.plan)}</text>`;
+    if (p.s <= S.asOf) svg += `<text class="v" x="${x + bw / 2 + 2}" y="${y(p.del) - 5}" text-anchor="middle" style="fill:var(--teal-d)">${fmt(p.del)}</text>`;
+    svg += `<text x="${x}" y="${H - B + 18}" text-anchor="middle">${dshort(p.s)} – ${dshort(p.e)}</text>`;
+    if (p.gap != null) svg += `<text x="${x}" y="${H - B + 36}" text-anchor="middle" style="fill:${p.gap > 0 ? '#c32d44' : '#157a52'};font-weight:800">backlog ${fmt(p.gap)}</text>`;
+  });
+  const pts = per.map((p, i) => p.gap == null ? null : `${L + i * cw + cw / 2},${gy(Math.max(0, p.gap)) }`).filter(Boolean);
+  if (pts.length > 1) svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="#e5822b" stroke-width="2.5" stroke-dasharray="6 4"/>`;
+  pts.forEach(pt => { const [a, b] = pt.split(','); svg += `<circle cx="${a}" cy="${b}" r="4" fill="#e5822b"/>`; });
+  svg += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#dfe6ec"/></svg>`;
+  $('#dTimeline').innerHTML = `<div class="tbl-wrap"><div style="min-width:720px">${svg}</div></div>`;
+
+  const order = { critical: 0, at_risk: 1, on_track: 2, na: 3, complete: 4 };
+  const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog);
+  $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
+    <th>Progress vs contract</th><th class="n">Backlog</th><th>Current / next slot</th><th class="n">Last slot</th><th>Status</th></tr></thead><tbody>` +
+    sorted.map(r => `<tr><td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>
+      <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
+      <td class="n">${fmt(r.due)}</td><td class="n">${fmt(r.delivered)}</td>
+      <td>${mini(r.delivered, r.contract)}</td>
+      <td class="n" ${r.backlog ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt(r.backlog)}</td>
+      <td>${r.next_start ? `${fmt(r.next_qty)} <span class="muted">· ${dshort(r.next_start)}–${dshort(r.next_end)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="n">${r.last_plan_date ? dshort(r.last_plan_date) : '—'}</td>
+      <td><span class="pill ${r.status === 'complete' ? 'on_track' : r.status}">${DSTAT[r.status]}</span></td></tr>`).join('') + '</tbody>';
+}
+function reasonText(r) {
+  const out = [];
+  if (r.reasons.includes('not_approved')) out.push('Model not approved');
+  if (r.reasons.includes('pace')) out.push(`Below 50% of plan due (${fmt(r.due - r.done)} behind)`);
+  if (r.material_zero) out.push(`<span title="${esc(r.material_zero.join(' | '))}" style="text-decoration:underline dotted;cursor:help">${r.material_zero.length} material${r.material_zero.length > 1 ? 's' : ''} at zero stock</span>`);
+  else if (!r.reasons.length && r.risk === 'at_risk') out.push(`${fmt(r.due - r.done)} behind plan due`);
+  return out.join('<br>') || '<span class="muted">—</span>';
+}
+function insightText(D) {
+  const sm = D.summary, rows = D.products;
+  if (!sm.in_view) return 'No products in the current view.';
+  if (!sm.critical) return sm.at_risk ? `No critical models. ${sm.at_risk} model${sm.at_risk > 1 ? 's are' : ' is'} between 50% and 90% of plan due to date.` : 'No critical or at-risk models in the current view.';
+  const rc = sm.reason_counts;
+  const top = Object.entries(rc).sort((a, b) => b[1] - a[1])[0];
+  const label = { material: 'material availability', pace: 'output pace', not_approved: 'model approval' }[top[0]];
+  const detail = { material: 'have a required material at zero stock', pace: 'are below 50% of plan due to date', not_approved: 'are not approved' }[top[0]];
+  const worst = rows.filter(r => r.due > r.done).sort((a, b) => (b.due - b.done) - (a.due - a.done))[0];
+  return `The primary execution constraint is ${label}: ${top[1]} of ${sm.critical} critical model${sm.critical > 1 ? 's' : ''} ${detail}.` +
+    (worst ? ` Largest shortfall: ${worst.name_en}, ${fmt(worst.due - worst.done)} units behind plan due by ${dshort(S.asOf < S.to ? S.asOf : S.to)}.` : '');
+}
+function mini(done, plan) {
+  const p = plan ? Math.min(1, done / plan) : 0;
+  return `<div class="mini"><div class="bar"><div class="d" style="width:${(p * 100).toFixed(1)}%"></div></div><em>${fmt(done)} / ${fmt(plan)}</em></div>`;
+}
+
+/* ====================== production ====================== */
+async function loadProduction() {
+  const [matrix, log, flow] = await Promise.all([
+    rpc('kayan_stage_matrix', { p_as_of: S.asOf }),
+    q(sb.from('kayan_production_entries').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
+    rpc('kayan_department_flow', { p_as_of: S.asOf }),
+  ]);
+  S.matrix = matrix; S.flow = flow; S.prodLog = log; renderFlow(); renderProduction(log);
+}
+function renderProduction(log) {
+  const pids = productIds();
+  renderProdCards();
+  if (S.prodDept) log = log.filter(r => r.stage === S.prodDept);
+  const byP = new Map();
+  S.matrix.forEach(m => { if (!byP.has(m.product_id)) byP.set(m.product_id, {}); byP.get(m.product_id)[m.stage] = m; });
+  const prods = S.ref.products.filter(p => !pids || pids.includes(p.id));
+  const cell = m => m ? mini(m.done, m.planned) : '<span class="muted">—</span>';
+  const cols = S.prodDept ? [S.prodDept] : ['chassis', 'foam', 'assembly'];
+  const shown = prods.filter(p => !S.prodDept || (byP.get(p.id) || {})[S.prodDept]);
+  $('#matrixTbl').innerHTML = `<thead><tr><th>Product</th>${cols.map(c => `<th>${DEPT[c]}</th>`).join('')}<th class="n">Scrap</th><th class="n">Contract</th></tr></thead><tbody>` +
+    (shown.map(p => { const s = byP.get(p.id) || {};
+      const scrap = cols.reduce((a, c) => a + (s[c]?.scrap || 0), 0);
+      return `<tr class="click" data-pid="${p.id}" tabindex="0"><td class="pname"><b>${esc(p.name_en)}</b><span class="ar">${esc(p.name_ar)}</span></td>
+        ${cols.map(c => `<td>${cell(s[c])}</td>`).join('')}<td class="n">${fmt(scrap)}</td><td class="n">${fmt(p.total_qty)}</td></tr>
+        <tr class="comp-row" data-for="${p.id}" hidden><td colspan="${cols.length + 3}">${compDetail(s, cols)}</td></tr>`; }).join('') ||
+      `<tr><td colspan="${cols.length + 3}" class="empty-state">No products in this department.</td></tr>`) + '</tbody>';
+  $$('#matrixTbl tr.click').forEach(tr => {
+    const toggle = () => { const r = $(`#matrixTbl tr[data-for="${tr.dataset.pid}"]`); r.hidden = !r.hidden; };
+    tr.onclick = toggle; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+  });
+  renderLog('#prodLog', log.filter(r => !pids || pids.includes(r.product_id)), 'production');
+}
+function renderProdCards() {
+  const pids = productIds();
+  const M = S.matrix.filter(m => !pids || pids.includes(m.product_id));
+  const F = S.flow.filter(r => !pids || pids.includes(r.product_id));
+  const agg = st => {
+    const rows = M.filter(m => m.stage === st);
+    return { plan: rows.reduce((a, m) => a + m.planned, 0), done: rows.reduce((a, m) => a + m.done, 0),
+      scrap: rows.reduce((a, m) => a + m.scrap, 0), models: rows.length, active: rows.filter(m => m.done > 0).length,
+      wip: F.reduce((a, r) => a + (r[st + '_wip'] || 0), 0), ready: F.reduce((a, r) => a + (r.ready_to_assemble || 0), 0) };
+  };
+  $('#prodDept').innerHTML = [['', 'All departments'], ...Object.entries(DEPT)].map(([k, v]) => {
+    const a = k ? agg(k) : null;
+    return `<button type="button" class="chip" data-pd="${k}" aria-pressed="${S.prodDept === k}">${v}${a ? ` (${pct(a.plan ? a.done / a.plan : null, 1)})` : ''}</button>`;
+  }).join('');
+  $$('#prodDept .chip').forEach(b => b.onclick = () => { S.prodDept = b.dataset.pd; renderProduction(S.prodLog); });
+  const card = (st, cls) => { const a = agg(st);
+    return `<article class="card ${cls}"><h3>${DEPT[st]}</h3><div class="metric">${fmt(a.done)} <small>/ ${fmt(a.plan)}</small></div>
+      <div class="sub">${pct(a.plan ? a.done / a.plan : null)} complete · ${a.active}/${a.models} models started<br>
+      ${st === 'assembly' ? `Ready to assemble: ${fmt(a.ready)}` : `WIP waiting for assembly: ${fmt(a.wip)}`} · scrap ${fmt(a.scrap)}</div></article>`; };
+  if (!S.prodDept) {
+    $('#prodCards').className = 'cards three';
+    $('#prodCards').innerHTML = card('chassis', '') + card('foam', 'amber') + card('assembly', 'amber');
+  } else {
+    const st = S.prodDept, a = agg(st), behind = F.filter(r => r[st + '_plan'] && r[st + '_done'] === 0).length;
+    $('#prodCards').className = 'cards';
+    $('#prodCards').innerHTML = `
+      <article class="card"><h3>${DEPT[st]} output</h3><div class="metric">${fmt(a.done)} <small>/ ${fmt(a.plan)}</small></div><div class="sub">${pct(a.plan ? a.done / a.plan : null)} of department scope</div></article>
+      <article class="card amber"><h3>${st === 'assembly' ? 'Ready to assemble' : 'WIP waiting for assembly'}</h3><div class="metric">${fmt(st === 'assembly' ? a.ready : a.wip)}</div>
+        <div class="sub">${st === 'assembly' ? 'Chassis + foam sets available now' : 'Produced here, not yet assembled'}</div></article>
+      <article class="card amber"><h3>Models started</h3><div class="metric">${a.active} <small>/ ${a.models}</small></div><div class="sub">${behind} model${behind === 1 ? '' : 's'} with no output yet</div></article>
+      <article class="card red"><h3>Scrap</h3><div class="metric">${fmt(a.scrap)}</div><div class="sub">${pct(a.done + a.scrap ? a.scrap / (a.done + a.scrap) : null, 2)} of units produced</div></article>`;
+  }
+}
+function renderFlow() {
+  const pids = productIds();
+  const rows = S.flow.filter(r => !pids || pids.includes(r.product_id));
+  const v = (x, cls = '') => x == null ? '<td class="n muted">—</td>' : `<td class="n ${cls}">${fmt(x)}</td>`;
+  const wip = x => x == null ? v(null) : v(x, x < 0 ? 'neg' : '');
+  const out = (d, p) => d == null ? v(null) : `<td class="n">${fmt(d)} <span class="muted">/ ${fmt(p)}</span></td>`;
+  const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
+  const FIN = { chassis: 'Chassis', foam: 'Foam', assembly: 'Assembly' };
+  $('#flowTbl').innerHTML = `<thead>
+    <tr><th></th><th class="grp sep" colspan="2">Chassis / welding</th><th class="grp sep" colspan="2">Foam injection</th><th class="grp sep" colspan="2">Assembly / upholstery</th><th class="grp sep" colspan="3">Finished goods</th></tr>
+    <tr><th>Product</th><th class="n sep">Output / plan</th><th class="n">WIP</th><th class="n sep">Output / plan</th><th class="n">WIP</th>
+      <th class="n sep">Ready to assemble</th><th class="n">Assembled / plan</th>
+      <th class="sep">Ships from</th><th class="n">Delivered</th><th class="n">In stock</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>
+      ${out(r.chassis_done, r.chassis_plan).replace('<td class="n">', '<td class="n sep">')}${wip(r.chassis_wip)}
+      ${out(r.foam_done, r.foam_plan).replace('<td class="n">', '<td class="n sep">')}${wip(r.foam_wip)}
+      ${r.ready_to_assemble == null ? '<td class="n sep muted">—</td>' : `<td class="n sep ${r.ready_to_assemble > 0 ? 'rta' : ''}">${fmt(r.ready_to_assemble)}</td>`}
+      ${out(r.assembly_done, r.assembly_plan)}
+      <td class="sep">${FIN[r.final_stage] || '—'}</td>${v(r.delivered)}${wip(r.finished_stock)}</tr>`).join('') +
+    `<tr><td><b>Total</b></td><td class="n sep"><b>${fmt(sum('chassis_done'))}</b></td><td class="n"><b>${fmt(sum('chassis_wip'))}</b></td>
+      <td class="n sep"><b>${fmt(sum('foam_done'))}</b></td><td class="n"><b>${fmt(sum('foam_wip'))}</b></td>
+      <td class="n sep rta">${fmt(sum('ready_to_assemble'))}</td><td class="n"><b>${fmt(sum('assembly_done'))}</b></td>
+      <td class="sep"></td><td class="n"><b>${fmt(sum('delivered'))}</b></td><td class="n"><b>${fmt(sum('finished_stock'))}</b></td></tr></tbody>`;
+}
+function compDetail(s, cols) {
+  const parts = Object.values(s).filter(m => (!cols || cols.includes(m.stage)) && (m.components.length > 1 || (m.components[0] && m.stage !== 'assembly')));
+  if (!parts.length) return '<span class="muted">Single-part stages only.</span>';
+  return parts.map(m => `<div style="margin:6px 0"><b>${STAGE[m.stage]}</b> — complete sets: ${fmt(m.done)} of ${fmt(m.planned)}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 18px;margin-top:6px">
+    ${m.components.map(c => `<div><span class="ar" style="font-size:13px">${esc(c.name_ar)}</span>${mini(c.done, c.planned)}</div>`).join('')}</div></div>`).join('');
+}
+
+/* ====================== materials ====================== */
+async function loadMaterials() {
+  const [st, log] = await Promise.all([
+    rpc('kayan_material_status', { p_as_of: S.asOf, p_lead_days: S.matLead }),
+    q(sb.from('kayan_material_txns').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
+  ]);
+  S.matStatus_ = st; renderMaterials(log);
+}
+function renderMaterials(log) {
+  const pids = productIds();
+  let rows = S.matStatus_.filter(m => !pids || m.product_ids.some(id => pids.includes(id)));
+  const dc = { chassis: 0, foam: 0 }; rows.forEach(r => r.stages.forEach(st => dc[st] = (dc[st] || 0) + 1));
+  $('#deptChips').innerHTML = [['', `All departments`], ['chassis', `Chassis / welding (${dc.chassis || 0})`], ['foam', `Foam injection (${dc.foam || 0})`]]
+    .map(([k, v]) => `<button type="button" class="chip" data-d="${k}" aria-pressed="${(S.matDept || '') === k}">${v}</button>`).join('');
+  $$('#deptChips .chip').forEach(b => b.onclick = () => { S.matDept = b.dataset.d; renderMaterials(log); });
+  if (S.matDept) rows = rows.filter(r => r.stages.includes(S.matDept));
+  const c = { zero: 0, short: 0, covered: 0, complete: 0 }; rows.forEach(r => c[r.status]++);
+  const reqTD = rows.reduce((a, r) => a + Number(r.required_to_date), 0);
+  const shortTD = rows.reduce((a, r) => a + Number(r.shortfall), 0);
+  const nShort = rows.filter(r => r.shortfall > 0).length;
+  $('#mShortPct').textContent = reqTD ? pct(shortTD / reqTD) : 'N/A';
+  $('#mShortSub').innerHTML = reqTD
+    ? `${fmt(shortTD)} of ${fmt(reqTD)} required by ${dshort(S.asOf)}${S.matLead ? ` (+${S.matLead}d lead)` : ''}<br>${nShort} material${nShort === 1 ? '' : 's'} short of the date requirement`
+    : 'Nothing required by this date yet';
+  $('#mZero').textContent = c.zero; $('#mShort').textContent = c.short;
+  $('#mCovered').textContent = c.covered + c.complete;
+  $('#mCoveredSub').textContent = `${c.covered} covered · ${c.complete} requirement complete`;
+  $('#matChips').innerHTML = [['', `All (${rows.length})`], ...Object.entries(MSTAT).map(([k, v]) => [k, `${v} (${c[k]})`])]
+    .map(([k, v]) => `<button type="button" class="chip" data-k="${k}" aria-pressed="${S.matStatus === k}">${v}</button>`).join('');
+  $$('#matChips .chip').forEach(b => b.onclick = () => { S.matStatus = b.dataset.k; renderMaterials(log); });
+  if (S.matStatus) rows = rows.filter(r => r.status === S.matStatus);
+  rows.sort((a, b) => b.shortfall - a.shortfall || b.remaining_req - a.remaining_req);
+  $('#matTbl').innerHTML = `<thead><tr><th>Material</th><th>Status</th><th>Department</th><th>Used by</th><th class="n">Planned</th><th class="n">Received</th><th class="n">Issued</th>
+    <th class="n">Adjusted</th><th class="n">On hand</th><th class="n">Theoretical use</th><th class="n">Remaining need</th><th>Coverage</th>
+    <th class="n">Required to date</th><th class="n">Shortfall</th><th class="n">Shortfall %</th></tr></thead><tbody>` +
+    (rows.map(m => `<tr><td class="ar" style="text-align:right;min-width:200px">${esc(m.name_ar)}</td>
+      <td><span class="pill ${m.status}">${MSTAT[m.status]}</span></td><td>${m.stages.map(s => STAGE[s]).join(', ')}</td><td>${m.product_ids.map(pname).join(', ')}</td>
+      <td class="n">${fmt2(m.planned)}</td><td class="n">${fmt2(m.received)}</td><td class="n">${fmt2(m.issued)}</td><td class="n">${fmt2(m.adjusted)}</td>
+      <td class="n"><b>${fmt2(m.on_hand)}</b></td><td class="n">${fmt2(m.theoretical_use)}</td><td class="n">${fmt2(m.remaining_req)}</td>
+      <td>${m.coverage == null ? '<span class="muted">—</span>' : `<div class="mini" style="min-width:120px"><div class="bar"><div class="d" style="width:${Math.min(100, m.coverage * 100).toFixed(1)}%"></div></div><em>${pct(m.coverage, 0)}</em></div>`}</td>
+      <td class="n">${fmt2(m.required_to_date)}</td>
+      <td class="n" ${m.shortfall > 0 ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt2(m.shortfall)}</td>
+      <td class="n" ${m.shortfall_pct >= 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${m.shortfall_pct == null ? '<span class="muted">—</span>' : pct(m.shortfall_pct, 0)}</td></tr>`).join('') ||
+      '<tr><td colspan="15" class="empty-state">No materials match.</td></tr>') + '</tbody>';
+  renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material');
+}
+
+/* ====================== assembly & delivery ====================== */
+async function loadAssembly() {
+  const [dm, log, dash, flow, dstat] = await Promise.all([
+    rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
+    q(sb.from('kayan_deliveries').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
+    rpc('kayan_dashboard', { p_stage: 'assembly', p_from: S.ref.periods[0]?.s || S.from, p_to: S.ref.periods.at(-1)?.e || S.to,
+      p_as_of: S.asOf, p_product_ids: productIds(), p_risk: null }),
+    rpc('kayan_department_flow', { p_as_of: S.asOf }),
+    rpc('kayan_delivery_status', { p_as_of: S.asOf }),
+  ]);
+  S.dm = dm; S.flow = flow; S.dstat = dstat; renderAssembly(log, dash);
+}
+function renderAssembly(log, dash) {
+  const pids = productIds();
+  const rows = S.dm.filter(r => !pids || pids.includes(r.product_id));
+  const periods = S.ref.periods;
+  const contract = S.ref.products.filter(p => !pids || pids.includes(p.id)).reduce((a, p) => a + p.total_qty, 0);
+  const delivered = dash.project.delivered;
+  // same server-side basis as the Overview delivery panel
+  const ds = S.dstat.filter(r => !pids || pids.includes(r.product_id));
+  const dueToDate = ds.reduce((a, r) => a + r.due, 0);
+  $('#aDone').innerHTML = `${fmt(dash.assembly.done)} <small>/</small> ${fmt(dash.assembly.scope)}`;
+  const ready = S.flow.filter(r => !pids || pids.includes(r.product_id)).reduce((a, r) => a + (r.ready_to_assemble || 0), 0);
+  $('#aDoneSub').textContent = `${pct(dash.assembly.scope ? dash.assembly.done / dash.assembly.scope : null)} of assembly scope · ${fmt(ready)} ready to assemble from chassis + foam`;
+  $('#aDel').innerHTML = `${fmt(delivered)} <small>/</small> ${fmt(contract)}`;
+  $('#aDelSub').textContent = `${pct(contract ? delivered / contract : null)} of contract quantity`;
+  const back = ds.reduce((a, r) => a + r.backlog, 0);
+  $('#aBack').textContent = fmt(back);
+  $('#aBackSub').textContent = `Plan due by ${dshort(S.asOf)}: ${fmt(dueToDate)} · delivered ${fmt(delivered)}`;
+  const byP = new Map(); rows.forEach(r => { if (!byP.has(r.product_id)) byP.set(r.product_id, {}); byP.get(r.product_id)[r.period_start] = r; });
+  const prods = S.ref.products.filter(p => !pids || pids.includes(p.id));
+  const cls = (r, p) => {
+    if (!r || (!r.planned && !r.delivered)) return 'empty';
+    if (p.s > S.asOf) return 'future';
+    if (p.e >= S.asOf) return 'current';
+    return r.delivered >= r.planned ? 'met' : 'short';
+  };
+  const tot = periods.map(p => ({ plan: 0, del: 0 }));
+  $('#dmTbl').innerHTML = `<thead><tr><th>Product</th>${periods.map(p => `<th class="n">${dshort(p.s)}–${dshort(p.e)}</th>`).join('')}<th class="n">Plan total</th><th class="n">Contract</th></tr></thead><tbody>` +
+    prods.map(p => { const m = byP.get(p.id) || {}; let pt = 0;
+      return `<tr><td class="pname"><b>${esc(p.name_en)}</b></td>${periods.map((per, i) => { const r = m[per.s];
+        if (r) { tot[i].plan += r.planned; tot[i].del += r.delivered; pt += r.planned; }
+        const c = cls(r, per);
+        return `<td class="cell ${c}" title="${r?.note ? esc(r.note) : ''}">${c === 'empty' ? (r?.note ? esc(r.note) : '·') : `${fmt(r.delivered)} / ${fmt(r.planned)}`}</td>`; }).join('')}
+        <td class="n">${fmt(pt)}</td><td class="n ${pt !== p.total_qty ? '' : ''}" ${pt !== p.total_qty ? `style="color:var(--red);font-weight:800" title="Scheduled ${fmt(pt)} vs contract ${fmt(p.total_qty)}"` : ''}>${fmt(p.total_qty)}</td></tr>`; }).join('') +
+    `<tr><td><b>Total</b></td>${tot.map(t => `<td class="cell"><b>${fmt(t.del)} / ${fmt(t.plan)}</b></td>`).join('')}<td class="n"><b>${fmt(tot.reduce((a, t) => a + t.plan, 0))}</b></td><td class="n"><b>${fmt(contract)}</b></td></tr></tbody>`;
+  renderLog('#delLog', log.filter(r => !pids || pids.includes(r.product_id)), 'delivery');
+}
+
+/* ====================== logs & voids ====================== */
+function renderLog(sel, rows, kind) {
+  const comp = id => S.ref.components.find(c => c.id === id)?.name_ar;
+  const mat = id => S.ref.materials.find(m => m.id === id)?.name_ar;
+  const head = { production: '<th>Date</th><th>Product</th><th>Stage</th><th>Part</th><th class="n">Qty</th><th class="n">Scrap</th><th>Shift</th><th>By</th><th>Note</th><th></th>',
+    delivery: '<th>Date</th><th>Product</th><th class="n">Qty</th><th>Delivery note</th><th>By</th><th>Note</th><th></th>',
+    material: '<th>Date</th><th>Type</th><th>Material</th><th class="n">Qty</th><th>Product</th><th>Reference</th><th>By</th><th></th>' }[kind];
+  const body = rows.map(r => {
+    const v = `<td><button class="btn danger" data-void="${kind}:${r.id}" type="button">Void</button></td>`;
+    if (kind === 'production') return `<tr><td>${dshort(r.entry_date)}</td><td>${esc(pname(r.product_id))}</td><td>${STAGE[r.stage]}</td>
+      <td>${r.component_id ? `<span class="ar">${esc(comp(r.component_id))}</span>` : '<span class="muted">Complete sets</span>'}</td>
+      <td class="n">${fmt(r.qty)}</td><td class="n">${fmt(r.scrap_qty)}</td><td>${esc(r.shift || '')}</td><td>${esc(r.recorded_by || '')}</td><td>${esc(r.note || '')}</td>${v}</tr>`;
+    if (kind === 'delivery') return `<tr><td>${dshort(r.delivery_date)}</td><td>${esc(pname(r.product_id))}</td><td class="n">${fmt(r.qty)}</td>
+      <td>${esc(r.delivery_note || '')}</td><td>${esc(r.recorded_by || '')}</td><td>${esc(r.note || '')}</td>${v}</tr>`;
+    return `<tr><td>${dshort(r.txn_date)}</td><td>${{ receipt: 'Receipt', issue: 'Issue', adjust: 'Adjustment' }[r.txn_type]}</td>
+      <td class="ar" style="text-align:right">${esc(mat(r.material_id))}</td><td class="n">${fmt2(r.txn_type === 'issue' ? -r.qty : r.qty)}</td>
+      <td>${r.product_id ? esc(pname(r.product_id)) : ''}</td><td>${esc(r.reference || '')}</td><td>${esc(r.recorded_by || '')}</td>${v}</tr>`;
+  }).join('');
+  $(sel).innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="10" class="empty-state">Nothing recorded yet. Use + Record to add the first entry.</td></tr>`}</tbody>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-void]'); if (!b) return;
+  const [kind, id] = b.dataset.void.split(':');
+  const ok = await withPin(`Void ${kind} entry #${id}. The entry stays in the database, marked as voided, and stops counting in all totals.`,
+    pin => rpc('kayan_void_entry', { p_kind: kind, p_id: Number(id), p_pin: pin }));
+  if (ok) { toast('Entry voided'); refresh(); }
+});
+
+/* ====================== record forms ====================== */
+// ---- Record tab: one department selection drives all three forms
+const DEPT = { chassis: 'Chassis / welding', foam: 'Foam injection', assembly: 'Assembly / upholstery' };
+const ORDER = ['chassis', 'foam', 'assembly'];
+const stagesOf = pid => S.ref.stages.filter(s => s.product_id === pid).map(s => s.stage).sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
+const shipsFrom = pid => stagesOf(pid).at(-1);
+function keepValue(sel, html) { const v = sel.value; sel.innerHTML = html; if ([...sel.options].some(o => o.value === v)) sel.value = v; }
+function buildRecordForms() {
+  const d = S.recDept, P = S.ref.products;
+  const opt = p => `<option value="${p.id}">${p.id}. ${esc(p.name_en)}</option>`;
+  $('#recDept').innerHTML = [['', 'All'], ...Object.entries(DEPT)].map(([k, v]) =>
+    `<button type="button" class="chip" data-rd="${k}" aria-pressed="${d === k}">${v}</button>`).join('');
+  $$('#recDept .chip').forEach(b => b.onclick = () => { S.recDept = b.dataset.rd; localStorage.setItem('kayan.recDept', S.recDept); buildRecordForms(); });
+  const prodP = P.filter(p => !d || stagesOf(p.id).includes(d));
+  const delP = P.filter(p => !d || shipsFrom(p.id) === d);
+  const mats = S.ref.materials.filter(m => !d || S.ref.reqs.some(r => r.material_id === m.id && r.stage === d));
+  keepValue($('#formProd [name=product_id]'), prodP.map(opt).join(''));
+  keepValue($('#formDel [name=product_id]'), delP.map(opt).join('') || '<option value="" disabled selected>No product ships from this department</option>');
+  keepValue($('#formMat [name=material_id]'), mats.map(m => `<option value="${m.id}">${esc(m.name_ar)}</option>`).join('') || '<option value="" disabled selected>No materials listed for this department</option>');
+  $('#recDeptHint').textContent = d
+    ? `${prodP.length} products · ${mats.length} materials · ${delP.length} ship to client from here`
+    : 'Select your department to show only its products and materials';
+  syncProdForm(); syncMatForm();
+}
+function syncMatForm() {
+  const id = Number($('#formMat [name=material_id]').value);
+  const uses = S.ref.reqs.filter(r => r.material_id === id);
+  const st = [...new Set(uses.map(r => r.stage))];
+  const users = [...new Set(uses.map(r => r.product_id))];
+  keepValue($('#formMat [name=product_id]'), (users.length > 1 ? '<option value="">— shared stock —</option>' : '') +
+    S.ref.products.filter(p => users.includes(p.id)).map(p => `<option value="${p.id}">${p.id}. ${esc(p.name_en)}</option>`).join(''));
+  $('#matHint').textContent = id ? `Department: ${st.map(x => DEPT[x]).join(', ') || '—'} · used by ${users.map(pname).join(', ') || '—'}.` : '';
+}
+function syncProdForm() {
+  const f = $('#formProd'); const pid = Number(f.product_id.value);
+  const stages = S.ref.stages.filter(s => s.product_id === pid && (!S.recDept || s.stage === S.recDept)).sort((a, b) => ORDER.indexOf(a.stage) - ORDER.indexOf(b.stage));
+  const cur = f.stage.value;
+  f.stage.innerHTML = stages.map(s => `<option value="${s.stage}">${DEPT[s.stage]}</option>`).join('');
+  if (stages.some(s => s.stage === cur)) f.stage.value = cur;
+  const comps = S.ref.components.filter(c => c.product_id === pid && c.stage === f.stage.value);
+  f.component_id.innerHTML = '<option value="">Complete sets (all parts)</option>' +
+    (comps.length > 1 ? comps.map(c => `<option value="${c.id}">${esc(c.name_ar)}</option>`).join('') : '');
+  f.component_id.disabled = comps.length <= 1;
+  const st = stages.find(s => s.stage === f.stage.value);
+  $('#prodHint').textContent = st ? `${STAGE[st.stage]} plan: ${fmt(st.planned_qty)} units${comps.length > 1 ? ` · ${comps.length} parts per unit` : ''}` : 'This product has no production stages.';
+}
+function initForms() {
+  const today = localISO();
+  $$('form input[type=date]').forEach(i => i.value = today);
+  $$('[data-remember]').forEach(i => { i.value = localStorage.getItem(LS.by) || ''; i.addEventListener('change', () => localStorage.setItem(LS.by, i.value)); });
+  $('#formProd').product_id.addEventListener('change', syncProdForm);
+  $('#formMat [name=material_id]').addEventListener('change', syncMatForm);
+  $('#formProd').stage.addEventListener('change', syncProdForm);
+  const clean = o => { for (const k in o) if (o[k] === '') o[k] = null; return o; };
+  const submit = (id, table, build, after, check) => $(id).addEventListener('submit', async e => {
+    e.preventDefault(); const f = e.target; const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try {
+      const row = build(Object.fromEntries(new FormData(f)));
+      if (check && !(await check(row))) return;
+      await q(sb.from(table).insert(clean(row)));
+      toast('Saved'); after(f); refresh();
+    } catch (err) { toast(errMsg(err), true); } finally { btn.disabled = false; }
+  });
+  submit('#formProd', 'kayan_production_entries', d => ({ ...d, product_id: +d.product_id, component_id: d.component_id ? +d.component_id : null,
+    qty: +d.qty, scrap_qty: +(d.scrap_qty || 0) }), f => { f.qty.value = ''; f.scrap_qty.value = 0; f.note.value = ''; f.qty.focus(); }, upstreamCheck);
+  submit('#formDel', 'kayan_deliveries', d => ({ ...d, product_id: +d.product_id, qty: +d.qty }),
+    f => { f.qty.value = ''; f.delivery_note.value = ''; f.note.value = ''; }, finishedStockCheck);
+  submit('#formMat', 'kayan_material_txns', d => {
+    const qty = Number(d.qty);
+    if (d.txn_type !== 'adjust' && !(qty > 0)) throw new Error('Receipts and issues need a positive quantity');
+    if (!qty) throw new Error('Quantity cannot be zero');
+    return { ...d, material_id: +d.material_id, product_id: d.product_id ? +d.product_id : null, qty };
+  }, f => { f.qty.value = ''; f.reference.value = ''; });
+}
+// Warn (not block) when a stage would exceed the output of the stage before it.
+// Opening balances produced before the tracker existed are a legitimate reason to override.
+async function upstreamCheck(row) {
+  const order = ['chassis', 'foam', 'assembly'];
+  const own = S.ref.stages.filter(s => s.product_id === row.product_id).map(s => s.stage).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  // Assembly is fed by chassis AND foam; chassis and foam are independent departments.
+  const feeders = row.stage === 'assembly' ? own.filter(st => st !== 'assembly') : [];
+  if (!feeders.length) return true;
+  const m = await rpc('kayan_stage_matrix', { p_as_of: row.entry_date });
+  const cur = m.find(x => x.product_id === row.product_id && x.stage === row.stage);
+  const after = (cur?.done || 0) + row.qty;
+  const short = feeders.map(st => ({ st, done: m.find(x => x.product_id === row.product_id && x.stage === st)?.done || 0 })).filter(f => after > f.done);
+  if (!short.length) return true;
+  const d = await dialog({ title: 'Above department output', ok: 'Record anyway',
+    html: `<p>${esc(pname(row.product_id))}: assembly would reach <b>${fmt(after)}</b> units, but ${short.map(f => `${STAGE[f.st]} output is <b>${fmt(f.done)}</b>`).join(' and ')} as of ${dlong(row.entry_date)}.</p>
+      <p class="muted">Record anyway only if those units were produced before tracking started or the department entry is still pending.</p>` });
+  return !!d;
+}
+// Warn when a client delivery exceeds finished stock of the shipping department.
+async function finishedStockCheck(row) {
+  const fl = await rpc('kayan_department_flow', { p_as_of: row.delivery_date });
+  const r = fl.find(x => x.product_id === row.product_id);
+  if (!r || r.finished_stock >= row.qty) return true;
+  const d = await dialog({ title: 'Delivery above finished stock', ok: 'Record anyway',
+    html: `<p>${esc(r.name_en)} ships from <b>${DEPT[r.final_stage]}</b>. Output recorded there: <b>${fmt(r.final_done)}</b>, already delivered: <b>${fmt(r.delivered)}</b>, so finished stock is <b>${fmt(r.finished_stock)}</b> as of ${dlong(row.delivery_date)}. This delivery is <b>${fmt(row.qty)}</b>.</p>
+      <p class="muted">Record the ${DEPT[r.final_stage].toLowerCase()} output first (Record output → department ${DEPT[r.final_stage]}). Record anyway only if the units were produced before tracking started.</p>` });
+  return !!d;
+}
+function renderApprovals() {
+  $('#apprTbl').innerHTML = `<thead><tr><th>#</th><th>Product</th><th class="n">Contract qty</th><th>Stages</th><th>Status</th><th>Approved on</th><th></th></tr></thead><tbody>` +
+    S.ref.products.map(p => `<tr><td>${p.id}</td><td class="pname"><b>${esc(p.name_en)}</b><span class="ar">${esc(p.name_ar)}</span></td>
+      <td class="n">${fmt(p.total_qty)}</td><td>${S.ref.stages.filter(s => s.product_id === p.id).map(s => STAGE[s.stage]).join(' → ')}</td>
+      <td><span class="pill ${p.approved ? 'on_track' : 'critical'}">${p.approved ? 'Approved' : 'Not approved'}</span></td>
+      <td>${p.approved_at ? dlong(p.approved_at) : ''}</td>
+      <td><button class="btn secondary" style="padding:6px 12px;font-size:13px" data-appr="${p.id}" data-to="${!p.approved}" type="button">${p.approved ? 'Revoke' : 'Approve'}</button></td></tr>`).join('') + '</tbody>';
+  $$('[data-appr]').forEach(b => b.onclick = async () => {
+    const id = +b.dataset.appr, to = b.dataset.to === 'true';
+    if (await withPin(`${to ? 'Approve' : 'Revoke approval for'} ${pname(id)}.`, pin => rpc('kayan_set_approval', { p_product_id: id, p_approved: to, p_pin: pin }))) {
+      toast('Approval updated'); await loadRef(); renderApprovals(); refresh();
+    }
+  });
+}
+let importPayload = null;
+function initImport() {
+  $('#importFile').addEventListener('change', async e => {
+    const file = e.target.files[0]; importPayload = null; $('#importBtn').disabled = true;
+    if (!file) return;
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      importPayload = parseKayanWorkbook(wb, XLSX, file.name);
+      const P = importPayload.products; const total = P.reduce((a, p) => a + p.total_qty, 0);
+      $('#importPreview').hidden = false;
+      $('#importPreview').innerHTML = `<p><b>${P.length} products · contract total ${fmt(total)}</b></p>
+        <div class="tbl-wrap"><table><thead><tr><th>#</th><th>Product</th><th class="n">Qty</th><th>Stages</th><th class="n">Parts</th><th class="n">BOM lines</th><th class="n">Delivery periods</th></tr></thead><tbody>
+        ${P.map(p => `<tr><td>${p.id}</td><td>${esc(p.name_en)}</td><td class="n">${fmt(p.total_qty)}</td><td>${p.stages.map(s => `${STAGE[s.stage]} ${fmt(s.planned_qty)}`).join(' → ')}</td>
+          <td class="n">${p.stages.reduce((a, s) => a + s.components.length, 0)}</td><td class="n">${p.requirements.length}</td><td class="n">${p.delivery.filter(d => d.qty).length}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p style="margin-bottom:6px"><b>Parser notes (${importPayload.warnings.length})</b></p><pre class="warn">${esc(importPayload.warnings.join('\n') || 'None')}</pre>`;
+      $('#importBtn').disabled = false;
+    } catch (err) { $('#importPreview').hidden = false; $('#importPreview').innerHTML = `<div class="banner on">Could not read this workbook: ${esc(errMsg(err))}</div>`; }
+  });
+  $('#importBtn').addEventListener('click', async () => {
+    if (!importPayload) return;
+    if (await withPin('Replace the plan with this workbook. Recorded entries and approvals are kept.',
+      async pin => { const r = await rpc('kayan_ingest_plan', { p_payload: importPayload, p_pin: pin });
+        toast(`Imported ${r.products} products, ${r.delivery_periods} delivery periods`); })) {
+      $('#importFile').value = ''; $('#importBtn').disabled = true; $('#importPreview').hidden = true; importPayload = null;
+      banner(''); await loadRef(); renderApprovals(); refresh();
+    }
+  });
+  $('#pinBtn').addEventListener('click', async () => {
+    const d = await dialog({ title: 'Change admin PIN', ok: 'Change PIN',
+      html: `<label class="field"><span>Current PIN</span><input type="password" id="pinOld" required></label>
+             <label class="field" style="margin-top:12px"><span>New PIN (6+ characters)</span><input type="password" id="pinNew" minlength="6" required></label>` });
+    if (!d) return;
+    try { await rpc('kayan_set_pin', { p_old: $('#pinOld').value, p_new: $('#pinNew').value }); sessionPin = null; toast('PIN changed'); }
+    catch (e) { toast(errMsg(e), true); }
+  });
+  $('#connBtn').addEventListener('click', () => connect(true));
+}
+
+/* ====================== export ====================== */
+async function exportXlsx() {
+  const btn = $('#exportBtn'); btn.disabled = true;
+  try {
+    const [matrix, mats, dm, prodLog, delLog, matLog] = await Promise.all([
+      rpc('kayan_stage_matrix', { p_as_of: S.asOf }), rpc('kayan_material_status', { p_as_of: S.asOf, p_lead_days: S.matLead }),
+      rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
+      fetchAll('kayan_production_entries', 'id'), fetchAll('kayan_deliveries', 'id'), fetchAll('kayan_material_txns', 'id')]);
+    const comp = id => S.ref.components.find(c => c.id === id)?.name_ar || '';
+    const mat = id => S.ref.materials.find(m => m.id === id)?.name_ar || '';
+    const D = S.dash; const wb = XLSX.utils.book_new();
+    const add = (name, rows, header) => { const ws = header ? XLSX.utils.aoa_to_sheet([...header, []]) : XLSX.utils.aoa_to_sheet([]);
+      XLSX.utils.sheet_add_json(ws, rows, { origin: header ? header.length + 1 : 0 });
+      ws['!cols'] = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(10, Math.min(45, k.length + 4)) }));
+      XLSX.utils.book_append_sheet(wb, ws, name); };
+    add('Overview', D.products.map(r => ({ Product: r.name_en, 'Product (AR)': r.name_ar, Target: r.target, 'Due to date': r.due, Completed: r.done,
+      'Achieved %': r.achievement == null ? null : +(r.achievement * 100).toFixed(1), 'Pace %': r.pace == null ? null : +(r.pace * 100).toFixed(1),
+      [`${STAGE[S.stage]} cumulative`]: r.stage_done_cum, [`${STAGE[S.stage]} plan`]: r.stage_scope, 'Delivered to client': r.delivered_cum,
+      Risk: RISK[r.risk], Drivers: [r.reasons.includes('not_approved') && 'Not approved', r.reasons.includes('pace') && 'Below 50% of due',
+        r.material_zero && ('Zero stock: ' + r.material_zero.join(', '))].filter(Boolean).join('; ') })),
+      [['KAYAN Manufacturing & Delivery Control'], [`Stage: ${STAGE[S.stage]}`, `Period: ${S.from} to ${S.to}`, `As of: ${S.asOf}`],
+       [`Product filter: ${S.product ? pname(+S.product) : 'All'}`, `Risk filter: ${S.risk ? RISK[S.risk] : 'All'}`],
+       [`Completed ${D.summary.done} / target ${D.summary.target}`, `Critical ${D.summary.critical}`, `Weighted readiness ${D.summary.weighted_readiness == null ? 'N/A' : (D.summary.weighted_readiness * 100).toFixed(1) + '%'}`]]);
+    add('Stage progress', matrix.flatMap(m => [{ Product: pname(m.product_id), Stage: STAGE[m.stage], Part: '(complete units)', Planned: m.planned, Done: m.done, Scrap: m.scrap },
+      ...(m.components.length > 1 ? m.components.map(c => ({ Product: pname(m.product_id), Stage: STAGE[m.stage], Part: c.name_ar, Planned: c.planned, Done: c.done, Scrap: null })) : [])]));
+    add('Materials', mats.map(m => ({ Material: m.name_ar, Stage: m.stages.map(s => STAGE[s]).join(', '), 'Used by': m.product_ids.map(pname).join(', '),
+      Planned: +m.planned, Received: +m.received, Issued: +m.issued, Adjusted: +m.adjusted, 'On hand': +m.on_hand,
+      'Theoretical use': +m.theoretical_use, 'Remaining need': +m.remaining_req, 'Coverage %': m.coverage == null ? null : +(m.coverage * 100).toFixed(1), Status: MSTAT[m.status],
+      'Required to date': +m.required_to_date, Supplied: +m.supplied, Shortfall: +m.shortfall,
+      'Shortfall %': m.shortfall_pct == null ? null : +(m.shortfall_pct * 100).toFixed(1) })));
+    const flow = await rpc('kayan_department_flow', { p_as_of: S.asOf });
+    add('Department flow', flow.map(r => ({ Product: r.name_en, 'Chassis plan': r.chassis_plan, 'Chassis output': r.chassis_done, 'Chassis WIP': r.chassis_wip,
+      'Foam plan': r.foam_plan, 'Foam output': r.foam_done, 'Foam WIP': r.foam_wip, 'Ready to assemble': r.ready_to_assemble,
+      'Assembly plan': r.assembly_plan, Assembled: r.assembly_done, 'Ships from': STAGE[r.final_stage], Delivered: r.delivered, 'Finished stock': r.finished_stock })));
+    add('Delivery status', S.dstat.map(r => ({ Product: r.name_en, Contract: r.contract, Scheduled: r.planned, Unscheduled: r.unscheduled,
+      [`Due by ${S.asOf}`]: r.due, Delivered: r.delivered, Backlog: r.backlog, 'Next slot start': r.next_start, 'Next slot qty': r.next_qty,
+      'Last slot': r.last_plan_date, Status: DSTAT[r.status] })));
+    add('Delivery plan vs actual', dm.map(r => ({ Product: pname(r.product_id), 'Period start': r.period_start, 'Period end': r.period_end, Planned: r.planned, Delivered: r.delivered, Note: r.note || '' })));
+    add('Production log', prodLog.map(r => ({ ID: r.id, Date: r.entry_date, Product: pname(r.product_id), Stage: STAGE[r.stage], Part: r.component_id ? comp(r.component_id) : 'Complete sets',
+      Qty: r.qty, Scrap: r.scrap_qty, Shift: r.shift || '', 'Recorded by': r.recorded_by || '', Note: r.note || '', Voided: r.deleted ? 'yes' : '' })));
+    add('Delivery log', delLog.map(r => ({ ID: r.id, Date: r.delivery_date, Product: pname(r.product_id), Qty: r.qty, 'Delivery note': r.delivery_note || '',
+      'Recorded by': r.recorded_by || '', Note: r.note || '', Voided: r.deleted ? 'yes' : '' })));
+    add('Material log', matLog.map(r => ({ ID: r.id, Date: r.txn_date, Type: r.txn_type, Material: mat(r.material_id), Qty: +r.qty,
+      Product: r.product_id ? pname(r.product_id) : '', Reference: r.reference || '', 'Recorded by': r.recorded_by || '', Voided: r.deleted ? 'yes' : '' })));
+    XLSX.writeFile(wb, `KAYAN_Tracker_${S.asOf}.xlsx`);
+    toast('Export ready');
+  } catch (e) { toast('Export failed: ' + errMsg(e), true); } finally { btn.disabled = false; }
+}
+
+
+/* ====================== status deck (PowerPoint) ====================== */
+const PPT_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js';
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (loadScript[src]) return res();
+    const el = document.createElement('script');
+    el.src = src; el.onload = () => { loadScript[src] = 1; res(); }; el.onerror = () => rej(new Error('Could not load ' + src));
+    document.head.appendChild(el);
+  });
+}
+const C = { navy: '0F2A43', ink: '10263B', muted: '5D6D7E', line: 'DFE6EC', teal: '2A9FC9', tealD: '1B7AA0',
+  amber: 'E3A826', red: 'D23A4F', green: '1F9D6B', bg: 'FFFFFF', soft: 'F2F6F9' };
+async function deckData() {
+  const P = S.ref.periods, from = P[0]?.s || S.from, to = P.at(-1)?.e || S.to;
+  const [dstat, dm, flow, matrix, mats, ch, fo, as] = await Promise.all([
+    rpc('kayan_delivery_status', { p_as_of: S.asOf }),
+    rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
+    rpc('kayan_department_flow', { p_as_of: S.asOf }),
+    rpc('kayan_stage_matrix', { p_as_of: S.asOf }),
+    rpc('kayan_material_status', { p_as_of: S.asOf, p_lead_days: S.matLead }),
+    ...['chassis', 'foam', 'assembly'].map(st => rpc('kayan_dashboard',
+      { p_stage: st, p_from: from, p_to: to, p_as_of: S.asOf, p_product_ids: null, p_risk: null })),
+  ]);
+  return { dstat, dm, flow, matrix, mats, dash: { chassis: ch, foam: fo, assembly: as }, from, to };
+}
+async function buildDeck() {
+  const btn = $('#deckBtn'); btn.disabled = true;
+  try {
+    await loadScript(PPT_CDN);
+    const D = await deckData();
+    const p = new PptxGenJS();
+    p.layout = 'LAYOUT_WIDE';                       // 13.3 x 7.5 in
+    p.author = 'KAYAN tracker'; p.title = 'KAYAN status';
+    const W = 13.3, sum = (a, k) => a.reduce((x, r) => x + (r[k] || 0), 0);
+    const T = (sl, t, o) => sl.addText(t, { isTextBox: true, fontFace: 'Nunito', ...o });
+    const head = (sl, eyebrow, title) => {
+      sl.addShape(p.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.95, fill: { color: C.navy } });
+      T(sl, eyebrow.toUpperCase(), { x: 0.55, y: 0.12, w: 9, h: 0.28, fontSize: 11, bold: true, charSpacing: 2, color: '7FD3EE' });
+      T(sl, title, { x: 0.55, y: 0.36, w: 10.5, h: 0.45, fontSize: 22, bold: true, color: 'FFFFFF' });
+      T(sl, `As of ${dlong(S.asOf)}`, { x: W - 3.3, y: 0.36, w: 2.75, h: 0.4, fontSize: 12, color: 'C9D6E2', align: 'right' });
+    };
+    const kpi = (sl, items, y) => items.forEach((it, i) => {
+      const w = (W - 1.1 - 0.2 * (items.length - 1)) / items.length, x = 0.55 + i * (w + 0.2);
+      sl.addShape(p.ShapeType.rect, { x, y, w, h: 1.15, fill: { color: C.soft }, line: { color: C.line, width: 1 } });
+      T(sl, it[0].toUpperCase(), { x: x + 0.15, y: y + 0.12, w: w - 0.3, h: 0.25, fontSize: 9.5, bold: true, charSpacing: 1, color: '56677A' });
+      T(sl, it[1], { x: x + 0.15, y: y + 0.36, w: w - 0.3, h: 0.45, fontSize: 24, bold: true, color: it[3] || C.ink });
+      T(sl, it[2] || '', { x: x + 0.15, y: y + 0.82, w: w - 0.3, h: 0.28, fontSize: 10, color: C.muted });
+    });
+    const table = (sl, rows, opts = {}) => sl.addTable(rows, { x: 0.55, y: opts.y || 1.35, w: W - 1.1, fontFace: 'Nunito',
+      fontSize: opts.fontSize || 10.5, color: C.ink, border: { type: 'solid', color: C.line, pt: 0.5 },
+      align: 'left', valign: 'middle', autoPage: false, ...opts });
+    const th = t => ({ text: t, options: { bold: true, fill: { color: 'EEF3F7' }, color: '35485C', fontSize: 9.5 } });
+    const n = (v, o = {}) => ({ text: fmt(v), options: { align: 'right', ...o } });
+    const RISKC = { critical: C.red, at_risk: 'A8700B', on_track: C.green, complete: C.green, na: C.muted };
+
+    const dsAll = D.dstat, contract = sum(dsAll, 'contract'), due = sum(dsAll, 'due'),
+      del = sum(dsAll, 'delivered'), back = sum(dsAll, 'backlog'), uns = sum(dsAll, 'unscheduled');
+    const behind = dsAll.filter(r => r.backlog > 0).sort((a, b) => b.backlog - a.backlog);
+    const deptAgg = st => { const rows = D.matrix.filter(m => m.stage === st);
+      return { plan: sum(rows, 'planned'), done: sum(rows, 'done'), scrap: sum(rows, 'scrap'),
+        models: rows.length, active: rows.filter(m => m.done > 0).length,
+        wip: sum(D.flow, st + '_wip'), ready: sum(D.flow, 'ready_to_assemble') }; };
+    const dep = { chassis: deptAgg('chassis'), foam: deptAgg('foam'), assembly: deptAgg('assembly') };
+    const zero = D.mats.filter(m => m.status === 'zero'), short = D.mats.filter(m => m.status === 'short');
+    const shortTDx = sum(D.mats, 'shortfall'), reqTDx = sum(D.mats, 'required_to_date');
+    const pctShortx = reqTDx ? pct(shortTDx / reqTDx) : 'N/A';
+    const negWip = D.flow.filter(r => (r.chassis_wip || 0) < 0 || (r.foam_wip || 0) < 0 || (r.finished_stock || 0) < 0);
+    const crit = Object.entries(D.dash).map(([st, d]) => ({ st, n: d.summary.critical, total: d.summary.in_view }));
+
+    /* 1 — title */
+    let sl = p.addSlide(); sl.background = { color: C.navy };
+    T(sl, 'KAYAN UNIVERSITY FURNITURE PROGRAM', { x: 0.8, y: 2.3, w: 11, h: 0.4, fontSize: 14, bold: true, charSpacing: 3, color: '7FD3EE' });
+    T(sl, 'Manufacturing & Delivery Status', { x: 0.8, y: 2.75, w: 11.5, h: 0.9, fontSize: 40, bold: true, color: 'FFFFFF' });
+    T(sl, `Status as of ${dlong(S.asOf)} · data through ${S.dash?.data_through ? dlong(S.dash.data_through) : 'no entries'}`,
+      { x: 0.8, y: 3.7, w: 11.5, h: 0.4, fontSize: 15, color: 'C9D6E2' });
+    T(sl, 'Generated from the live tracker · internal management review', { x: 0.8, y: 4.15, w: 11.5, h: 0.4, fontSize: 12, color: '8FA6BA' });
+    sl.addNotes('Every figure in this deck is read from the tracker database at the moment the deck was generated.');
+
+    /* 2 — executive summary */
+    sl = p.addSlide(); head(sl, 'Executive summary', 'Where the programme stands');
+    kpi(sl, [['Contract', fmt(contract), `${dsAll.length} products`],
+      ['Plan due to date', fmt(due), `${pct(contract ? due / contract : null)} of contract`],
+      ['Delivered', fmt(del), `${pct(due ? del / due : null)} of due`],
+      ['Delivery backlog', fmt(back), `${behind.length} products behind`, back ? C.red : C.ink],
+      ['Unscheduled', fmt(uns), uns ? 'no delivery date' : 'all scheduled', uns ? C.red : C.ink]], 1.2);
+    const bullets = [];
+    if (back) bullets.push(`Delivery backlog is ${fmt(back)} units; largest: ${behind.slice(0, 3).map(r => `${r.name_en} ${fmt(r.backlog)}`).join(', ')}.`);
+    else bullets.push('No delivery backlog against the schedule to date.');
+    bullets.push(`Department output to date — chassis ${fmt(dep.chassis.done)} of ${fmt(dep.chassis.plan)} (${pct(dep.chassis.plan ? dep.chassis.done / dep.chassis.plan : null)}), foam ${fmt(dep.foam.done)} (${pct(dep.foam.plan ? dep.foam.done / dep.foam.plan : null)}), assembly ${fmt(dep.assembly.done)} (${pct(dep.assembly.plan ? dep.assembly.done / dep.assembly.plan : null)}).`);
+    if (zero.length || shortTDx) bullets.push(`Material shortfall against the requirement due to date is ${pctShortx} (${fmt(shortTDx)} units); ${zero.length} materials at zero stock.`);
+    bullets.push(`Models not started: chassis ${dep.chassis.models - dep.chassis.active}/${dep.chassis.models}, foam ${dep.foam.models - dep.foam.active}/${dep.foam.models}, assembly ${dep.assembly.models - dep.assembly.active}/${dep.assembly.models}.`);
+    if (uns) bullets.push(`${fmt(uns)} units (${dsAll.filter(r => r.unscheduled).map(r => r.name_en).join(', ')}) have no delivery date in the schedule — planning decision required.`);
+    if (negWip.length) bullets.push(`Data check: ${negWip.length} product(s) show output recorded downstream of an earlier department — ${negWip.map(r => r.name_en).join(', ')}.`);
+    T(sl, bullets.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < bullets.length - 1 } })),
+      { x: 0.55, y: 2.6, w: W - 1.1, h: 3.3, fontSize: 13, color: C.ink, paraSpaceAfter: 8 });
+
+    /* 3 — delivery commitments */
+    sl = p.addSlide(); head(sl, 'Delivery commitments', 'Contract vs schedule vs delivered');
+    const dsSorted = [...dsAll].sort((a, b) => b.backlog - a.backlog || b.contract - a.contract);
+    table(sl, [[th('Product'), th('Contract'), th('Due to date'), th('Delivered'), th('Backlog'), th('Current / next slot'), th('Last slot'), th('Status')],
+      ...dsSorted.map(r => [r.name_en, n(r.contract), n(r.due), n(r.delivered),
+        n(r.backlog, { color: r.backlog ? C.red : C.ink, bold: !!r.backlog }),
+        r.next_start ? `${fmt(r.next_qty)} · ${dshort(r.next_start)}–${dshort(r.next_end)}` : '—',
+        r.last_plan_date ? dshort(r.last_plan_date) : '—',
+        { text: DSTAT[r.status], options: { color: RISKC[r.status], bold: true } }])],
+      { fontSize: 9.5, colW: [2.9, 1.1, 1.2, 1.1, 1.05, 2.5, 0.95, 1.4], rowH: 0.26 });
+    T(sl, 'Due to date pro-rates the current delivery period to the status date. Backlog = due − delivered.',
+      { x: 0.55, y: 6.85, w: 9, h: 0.3, fontSize: 9.5, color: C.muted });
+
+    /* 4 — delivery timeline */
+    sl = p.addSlide(); head(sl, 'Delivery schedule', 'Planned vs delivered by period');
+    const labels = S.ref.periods.map(x => `${dshort(x.s)}–${dshort(x.e)}`);
+    const plan = S.ref.periods.map(x => sum(D.dm.filter(r => r.period_start === x.s), 'planned'));
+    const dlv = S.ref.periods.map(x => sum(D.dm.filter(r => r.period_start === x.s), 'delivered'));
+    sl.addChart(p.ChartType.bar, [{ name: 'Planned', labels, values: plan }, { name: 'Delivered', labels, values: dlv }],
+      { x: 0.55, y: 1.25, w: W - 1.1, h: 4.3, barDir: 'col', chartColors: [C.line.replace('DFE6EC', 'CFD9E1'), C.teal],
+        showLegend: true, legendPos: 'b', legendFontFace: 'Nunito', showValue: true, dataLabelPosition: 'outEnd',
+        dataLabelFontSize: 9, dataLabelFontFace: 'Nunito', catAxisLabelFontSize: 9, catAxisLabelColor: '56677A',
+        valAxisLabelColor: '56677A', valGridLine: { color: 'EEF3F7', size: 1 }, catGridLine: { style: 'none' } });
+    T(sl, `Delivered to date ${fmt(del)} of ${fmt(due)} due · backlog ${fmt(back)}${uns ? ` · ${fmt(uns)} units still unscheduled` : ''}`,
+      { x: 0.55, y: 5.75, w: W - 1.1, h: 0.4, fontSize: 13, bold: true, color: back ? C.red : C.ink });
+
+    /* 5 — department output */
+    sl = p.addSlide(); head(sl, 'Departments', 'Output against scope');
+    sl.addChart(p.ChartType.bar, [
+      { name: 'Output', labels: ['Chassis / welding', 'Foam injection', 'Assembly / upholstery'], values: [dep.chassis.done, dep.foam.done, dep.assembly.done] },
+      { name: 'Scope', labels: ['Chassis / welding', 'Foam injection', 'Assembly / upholstery'], values: [dep.chassis.plan, dep.foam.plan, dep.assembly.plan] }],
+      { x: 0.55, y: 1.3, w: 6.2, h: 3.6, barDir: 'col', chartColors: [C.teal, 'CFD9E1'], showLegend: true, legendPos: 'b',
+        legendFontFace: 'Nunito', showValue: true, dataLabelPosition: 'outEnd', dataLabelFontSize: 9, dataLabelFontFace: 'Nunito',
+        catAxisLabelFontSize: 9, catAxisLabelColor: '56677A', valAxisLabelColor: '56677A', valGridLine: { color: 'EEF3F7', size: 1 }, catGridLine: { style: 'none' } });
+    sl.addTable([[th('Department'), th('Output'), th('Scope'), th('%'), th('WIP / ready'), th('Models started'), th('Scrap')],
+      ...[['chassis', dep.chassis], ['foam', dep.foam], ['assembly', dep.assembly]].map(([k, a]) =>
+        [DEPT[k], n(a.done), n(a.plan), { text: pct(a.plan ? a.done / a.plan : null), options: { align: 'right' } },
+          n(k === 'assembly' ? a.ready : a.wip), { text: `${a.active} / ${a.models}`, options: { align: 'right' } }, n(a.scrap)])],
+      { x: 7.0, y: 1.35, w: 5.75, fontFace: 'Nunito', fontSize: 10, color: C.ink, rowH: 0.32,
+        border: { type: 'solid', color: C.line, pt: 0.5 }, colW: [1.75, 0.72, 0.78, 0.6, 0.85, 0.65, 0.4] });
+    T(sl, [{ text: 'Chassis and foam feed assembly (one set each per chair). WIP is output not yet assembled; for assembly, "ready" is the number of chairs that can be assembled now from available sets.', options: { bullet: true, breakLine: true } },
+      { text: `Assembly is limited to ${fmt(dep.assembly.ready)} chairs until more chassis or foam is produced.`, options: { bullet: true } }],
+      { x: 7.0, y: 3.1, w: 5.75, h: 1.9, fontSize: 11, color: C.ink, paraSpaceAfter: 6 });
+
+    /* 6 — bottlenecks */
+    sl = p.addSlide(); head(sl, 'Bottlenecks', 'Where the line is constrained');
+    const fl = D.flow.filter(r => (r.chassis_done || 0) + (r.foam_done || 0) + (r.assembly_done || 0) + (r.delivered || 0) > 0 || r.ready_to_assemble > 0);
+    const rows = (fl.length ? fl : D.flow).slice(0, 11);
+    table(sl, [[th('Product'), th('Chassis'), th('Chassis WIP'), th('Foam'), th('Foam WIP'), th('Ready to assemble'), th('Assembled'), th('Finished stock')],
+      ...rows.map(r => [r.name_en, n(r.chassis_done ?? 0), n(r.chassis_wip ?? 0), n(r.foam_done ?? 0), n(r.foam_wip ?? 0),
+        n(r.ready_to_assemble ?? 0, { color: r.ready_to_assemble ? C.tealD : C.ink, bold: !!r.ready_to_assemble }),
+        n(r.assembly_done ?? 0), n(r.finished_stock ?? 0, { color: (r.finished_stock ?? 0) < 0 ? C.red : C.ink })])],
+      { fontSize: 10, colW: [3.2, 1.2, 1.3, 1.2, 1.2, 1.7, 1.2, 1.2], rowH: 0.3 });
+    const bn = [];
+    const noOut = D.flow.filter(r => r.chassis_plan && !r.chassis_done).map(r => r.name_en);
+    if (noOut.length) bn.push(`No chassis output yet: ${noOut.join(', ')}.`);
+    const waiting = D.flow.filter(r => r.assembly_plan && (r.ready_to_assemble || 0) === 0 && (r.assembly_done || 0) < r.assembly_plan).map(r => r.name_en);
+    if (waiting.length) bn.push(`Cannot assemble today (chassis or foam missing): ${waiting.slice(0, 8).join(', ')}${waiting.length > 8 ? '…' : ''}.`);
+    if (negWip.length) bn.push(`Negative stock/WIP indicates missing upstream entries: ${negWip.map(r => r.name_en).join(', ')}.`);
+    T(sl, bn.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < bn.length - 1 } })),
+      { x: 0.55, y: 5.5, w: W - 1.1, h: 1.6, fontSize: 11.5, color: C.ink, paraSpaceAfter: 6 });
+
+    /* 7 — materials */
+    sl = p.addSlide(); head(sl, 'Materials', 'Stock against remaining requirement');
+    kpi(sl, [['Shortfall to date', pctShortx, `${fmt(shortTDx)} of ${fmt(reqTDx)} required by now`, shortTDx ? C.red : C.ink],
+      ['At zero stock', String(zero.length), 'requirement remaining', zero.length ? C.red : C.ink],
+      ['Short', String(short.length), 'below remaining need', short.length ? 'A8700B' : C.ink],
+      ['Covered / complete', String(D.mats.filter(m => m.status === 'covered' || m.status === 'complete').length), 'no action needed']], 1.2);
+    const worst = D.mats.filter(m => m.shortfall > 0).sort((a, b) => b.shortfall - a.shortfall).slice(0, 8);
+    sl.addTable([[th('Material'), th('Department'), th('Used by'), th('Required to date'), th('Supplied'), th('Shortfall'), th('Shortfall %')],
+      ...worst.map(m => [{ text: m.name_ar, options: { fontFace: 'Cairo', rtlMode: true, align: 'right' } },
+        m.stages.map(x => STAGE[x]).join(', '), m.product_ids.map(pname).join(', '),
+        n(m.required_to_date), n(m.supplied), n(m.shortfall, { color: C.red, bold: true }),
+        { text: pct(m.shortfall_pct, 0), options: { align: 'right', color: C.red, bold: true } }])],
+      { x: 0.55, y: 2.65, w: W - 1.1, fontFace: 'Nunito', fontSize: 9.5, color: C.ink, rowH: 0.3,
+        border: { type: 'solid', color: C.line, pt: 0.5 }, colW: [3.3, 1.2, 2.6, 1.5, 1.1, 1.2, 1.3] });
+    T(sl, shortTDx ? `${pctShortx} of the material required by ${dshort(S.asOf)} has not been supplied; ${zero.length} materials stand at zero stock.` : 'Material supplied covers the requirement to date.',
+      { x: 0.55, y: 6.5, w: W - 1.1, h: 0.4, fontSize: 11.5, bold: true, color: zero.length ? C.red : C.green });
+
+    /* 8 — risk & actions */
+    sl = p.addSlide(); head(sl, 'Risk & actions', 'What needs a decision');
+    kpi(sl, crit.map(c => [`${STAGE[c.st]} critical`, `${c.n} / ${c.total}`, 'models flagged', c.n ? C.red : C.ink])
+      .concat([['Weighted readiness', pct(D.dash.chassis.summary.weighted_readiness), 'chassis, volume-weighted']]), 1.2);
+    const act = [];
+    if (uns) act.push(`Planning: schedule the remaining ${fmt(uns)} units (${dsAll.filter(r => r.unscheduled).map(r => r.name_en).join(', ')}) — no delivery date exists today.`);
+    if (shortTDx) act.push(`Stores / purchasing: close the ${fmt(shortTDx)} units short against the requirement due by ${dshort(S.asOf)} (${pctShortx}), starting with the ${zero.length} materials at zero stock.`);
+    if (behind.length) act.push(`Production: recover ${fmt(back)} units of delivery backlog, starting with ${behind.slice(0, 3).map(r => r.name_en).join(', ')}.`);
+    if (dep.assembly.ready) act.push(`Assembly: ${fmt(dep.assembly.ready)} chairs can be assembled now from existing chassis and foam.`);
+    const unapproved = D.dash.assembly.products.filter(r => !r.approved).map(r => r.name_en);
+    if (unapproved.length) act.push(`Approvals: ${unapproved.length} models not approved (${unapproved.slice(0, 6).join(', ')}${unapproved.length > 6 ? '…' : ''}).`);
+    if (negWip.length) act.push(`Data: correct the entries for ${negWip.map(r => r.name_en).join(', ')} (output recorded downstream only).`);
+    act.push('Tracker: all departments record output daily so this status stays accurate.');
+    T(sl, act.map((t, i) => ({ text: t, options: { bullet: true, breakLine: i < act.length - 1 } })),
+      { x: 0.55, y: 2.75, w: W - 1.1, h: 3.6, fontSize: 13.5, color: C.ink, paraSpaceAfter: 10 });
+    T(sl, 'Source: KAYAN tracker · regenerate this deck at any time from the Deck button', { x: 0.55, y: 6.9, w: 9, h: 0.3, fontSize: 9.5, color: C.muted });
+
+    await p.writeFile({ fileName: `KAYAN_Status_${S.asOf}.pptx` });
+    toast('Deck ready');
+  } catch (e) { toast('Deck failed: ' + errMsg(e), true); }
+  finally { btn.disabled = false; }
+}
+
+/* ====================== navigation & refresh ====================== */
+function showTab(tab) {
+  S.tab = tab;
+  $$('nav.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== tab);
+  $$('#filters [data-for=overview]').forEach(el => el.style.display = tab === 'overview' ? '' : 'none');
+  $('#filters').hidden = tab === 'record';
+  if (tab === 'overview') $('#customRange').classList.toggle('on', S.period === 'custom');
+  $('#inView').hidden = tab !== 'overview';
+  refresh();
+}
+let refreshing = null, again = false;
+async function refresh() {
+  if (!sb) return;
+  if (refreshing) { again = true; return refreshing; }
+  const main = $('main'); main.classList.add('loading');
+  refreshing = (async () => {
+    try {
+      banner(S.ref.products.length ? '' : $('#banner').textContent);
+      await loadOverview();          // also feeds header "data through" and delivered totals
+      if (S.tab === 'production') await loadProduction();
+      if (S.tab === 'materials') await loadMaterials();
+      if (S.tab === 'assembly') await loadAssembly();
+      if (S.tab === 'record') { renderApprovals(); buildRecordForms(); }
+    } catch (e) { banner('Could not load data: ' + errMsg(e)); }
+    finally { main.classList.remove('loading'); refreshing = null; if (again) { again = false; refresh(); } }
+  })();
+  return refreshing;
+}
+function initFilters() {
+  $('#fAsOf').value = S.asOf;
+  ['#fProduct', '#fRisk', '#fStage', '#fPeriod', '#fFrom', '#fTo', '#fAsOf'].forEach(id =>
+    $(id).addEventListener('change', () => { readFilters(); refresh(); }));
+  $('#resetBtn').addEventListener('click', () => {
+    $('#fProduct').value = ''; $('#fRisk').value = ''; $('#fStage').value = 'chassis';
+    S.asOf = localISO(); $('#fAsOf').value = S.asOf; S.period = defaultPeriodKey(periodOptions()); $('#fPeriod').value = S.period;
+    readFilters(); refresh();
+  });
+  $$('nav.tabs [role=tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  $('#mLead').addEventListener('change', e => { S.matLead = Math.max(0, +e.target.value || 0); if (S.tab === 'materials') refresh(); });
+  $('#exportBtn').addEventListener('click', exportXlsx);
+  $('#deckBtn').addEventListener('click', buildDeck);
+}
+
+/* ====================== connection & realtime ====================== */
+async function connect(force = false) {
+  let url = localStorage.getItem(LS.url) || DEFAULT_URL;
+  let key = localStorage.getItem(LS.key) || DEFAULT_ANON_KEY;
+  if (force || !url || !key) {
+    const d = await dialog({ title: 'Connect to Supabase', ok: 'Connect',
+      html: `<p class="muted">Project settings → API. The anon key is public by design; writes are limited by row-level security.</p>
+        <label class="field"><span>Project URL</span><input type="text" id="cUrl" value="${esc(url)}" required></label>
+        <label class="field" style="margin-top:12px"><span>Anon key</span><input type="text" id="cKey" value="${esc(key)}" required></label>` });
+    if (!d) { if (!key) banner('Not connected. Use Record → Change Supabase connection.'); return; }
+    url = $('#cUrl').value.trim().replace(/\/+$/, ''); key = $('#cKey').value.trim();
+    localStorage.setItem(LS.url, url); localStorage.setItem(LS.key, key);
+  }
+  try {
+    sb = window.supabase.createClient(url, key, { auth: { persistSession: false } });
+    await loadRef(); renderApprovals();
+    sb.channel('kayan-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kayan_production_entries' }, liveRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kayan_deliveries' }, liveRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kayan_material_txns' }, liveRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kayan_products' }, () => loadRef().then(liveRefresh))
+      .subscribe(st => $('#liveDot').classList.toggle('off', st !== 'SUBSCRIBED'));
+    await refresh();
+  } catch (e) { banner('Connection failed: ' + errMsg(e)); }
+}
+let liveT; function liveRefresh() { clearTimeout(liveT); liveT = setTimeout(refresh, 700); }
+
+initFilters(); initForms(); initImport();
+showTab('overview');
+connect();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
