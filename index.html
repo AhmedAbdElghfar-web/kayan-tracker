@@ -297,7 +297,8 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <label class="field"><span>From</span><input type="date" id="fFrom"></label>
       <label class="field"><span>To</span><input type="date" id="fTo"></label>
     </div>
-    <label class="field"><span>As of</span><input type="date" id="fAsOf"></label>
+    <label class="field" data-for="overview"><span>As of</span><input type="date" id="fAsOf"></label>
+    <label class="field" data-for="monthly"><span>Month</span><select id="fMonth"></select></label>
     <button class="linkbtn" id="resetBtn" type="button">Reset filters</button>
     <span class="inview" id="inView"></span>
   </section>
@@ -357,6 +358,14 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <section data-view="production" hidden>
     <div class="chips" id="prodDept"></div>
     <div class="cards" id="prodCards"></div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow" id="pcEyebrow">Department output by period</div><h2>Planned vs output</h2></div>
+        <div class="legend"><span><i style="background:var(--target)"></i>Planned</span><span><i style="background:var(--teal)"></i>Output</span><span><i style="background:var(--orange)"></i>Cumulative backlog</span></div></div>
+      <div class="chips" id="pcDept"></div>
+      <div class="kpis" id="pcKpis"></div>
+      <div id="pcChart"></div>
+      <p class="hint" id="pcHint"></p>
+    </article>
     <article class="panel">
       <div class="panel-head"><div><div class="eyebrow">Department flow</div><h2>Output, WIP and what assembly can start</h2></div>
         <span class="hint">Cumulative to the As-of date</span></div>
@@ -371,26 +380,33 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <div class="tbl-wrap"><table id="matrixTbl"></table></div>
     </article>
     <article class="panel section">
-      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent production entries</h2></div></div>
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2 id="prodLogTitle">Production entries</h2></div></div>
       <div class="tbl-wrap"><table id="prodLog"></table></div>
     </article>
   </section>
 
   <!-- MATERIALS -->
   <section data-view="materials" hidden>
+    <div class="chips" id="deptChips"></div>
     <div class="cards">
       <article class="card red"><h3>Shortfall to date</h3><div class="metric" id="mShortPct">—</div><div class="sub" id="mShortSub"></div></article>
       <article class="card red"><h3>At zero stock</h3><div class="metric" id="mZero">—</div><div class="sub">Requirement remaining, nothing on hand</div></article>
       <article class="card amber"><h3>Short</h3><div class="metric" id="mShort">—</div><div class="sub">On hand below remaining need</div></article>
       <article class="card"><h3>Covered / complete</h3><div class="metric" id="mCovered">—</div><div class="sub" id="mCoveredSub"></div></article>
     </div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow" id="mcEyebrow">Material supply by period</div><h2>Required vs supplied</h2></div>
+        <div class="legend"><span><i style="background:var(--target)"></i>Required</span><span><i style="background:var(--teal)"></i>Supplied</span><span><i style="background:var(--orange)"></i>Cumulative shortfall</span></div></div>
+      <div class="kpis" id="mcKpis"></div>
+      <div id="mcChart"></div>
+      <p class="hint" id="mcHint"></p>
+    </article>
     <article class="panel">
       <div class="panel-head"><div><div class="eyebrow">Stock vs requirement</div><h2>Material coverage</h2></div>
         <label class="field" style="flex-direction:row;align-items:center;gap:10px">
           <span style="white-space:nowrap">Lead time (days)</span>
           <input type="number" id="mLead" min="0" max="120" step="1" value="0" style="width:90px;min-height:42px" title="Material needed this many days before the client delivery slot">
         </label></div>
-      <div class="chips" id="deptChips"></div>
       <div class="chips" id="matChips"></div>
       <div class="tbl-wrap"><table id="matTbl"></table></div>
       <p class="hint">On hand = receipts − issues ± adjustments. Theoretical use = planned qty × (units completed ÷ department plan). Remaining need = planned − theoretical use.<br>
@@ -398,7 +414,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       Issues and adjustments are folded into On hand — hover it for the breakdown, or see the movement log below and the Excel export.</p>
     </article>
     <article class="panel section">
-      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent material movements</h2></div></div>
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2 id="matLogTitle">Material movements</h2></div></div>
       <div class="tbl-wrap"><table id="matLog"></table></div>
     </article>
   </section>
@@ -410,13 +426,20 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <article class="card amber"><h3>Delivered to client</h3><div class="metric" id="aDel">—</div><div class="sub" id="aDelSub"></div></article>
       <article class="card red"><h3>Delivery backlog</h3><div class="metric" id="aBack">—</div><div class="sub" id="aBackSub"></div></article>
     </div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow" id="acEyebrow">Client delivery by period</div><h2>Planned vs delivered</h2></div>
+        <div class="legend"><span><i style="background:var(--target)"></i>Planned</span><span><i style="background:var(--teal)"></i>Delivered</span><span><i style="background:var(--orange)"></i>Cumulative backlog</span></div></div>
+      <div class="kpis" id="acKpis"></div>
+      <div id="acChart"></div>
+      <p class="hint" id="acHint"></p>
+    </article>
     <article class="panel">
       <div class="panel-head"><div><div class="eyebrow">Client delivery plan</div><h2>Delivered vs plan by period</h2></div>
         <span class="hint">Cells show delivered / planned. Red: closed period below plan.</span></div>
       <div class="tbl-wrap"><table class="dm" id="dmTbl"></table></div>
     </article>
     <article class="panel section">
-      <div class="panel-head"><div><div class="eyebrow">Log</div><h2>Recent client deliveries</h2></div></div>
+      <div class="panel-head"><div><div class="eyebrow">Log</div><h2 id="delLogTitle">Client deliveries</h2></div></div>
       <div class="tbl-wrap"><table id="delLog"></table></div>
     </article>
   </section>
@@ -747,6 +770,7 @@ async function withPin(purpose, fn) {
 /* ====================== state ====================== */
 const S = {
   tab: 'overview', stage: 'chassis', period: null, from: null, to: null, asOf: localISO(),
+  month: localISO().slice(0, 7), pcDept: 'chassis',
   product: '', risk: '', matStatus: '', matDept: '', matLead: 0, prodDept: '', recDept: localStorage.getItem('kayan.recDept') || '',
   ref: { products: [], stages: [], components: [], materials: [], periods: [] },
   dash: null, matrix: null, matStatus_: null, dm: null,
@@ -819,17 +843,103 @@ function buildSelects() {
   if (!S.period || !opts.some(o => o.key === S.period)) S.period = defaultPeriodKey(opts);
   $('#fPeriod').innerHTML = opts.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
   $('#fPeriod').value = S.period; applyPeriod();
+  const mo = monthOptions();
+  if (!mo.some(o => o.key === S.month)) S.month = localISO().slice(0, 7);
+  $('#fMonth').innerHTML = mo.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
+  $('#fMonth').value = S.month;
   buildRecordForms();
   syncProdForm();
 }
 function readFilters() {
   S.product = $('#fProduct').value; S.risk = $('#fRisk').value; S.stage = $('#fStage').value;
   S.period = $('#fPeriod').value; S.asOf = $('#fAsOf').value || localISO();
+  S.month = $('#fMonth').value || S.month;
   if (S.period === 'custom') { S.from = $('#fFrom').value || S.from; S.to = $('#fTo').value || S.to; }
   applyPeriod();
 }
 function productIds() { return S.product ? [Number(S.product)] : null; }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
+
+/* ====================== month filter (production / materials / assembly) ====================== */
+// These views take a month instead of a day. Status date = month end, or today while the month is running
+// (a future month shows today's status, with that month highlighted in the charts).
+const MONTHLY = ['production', 'materials', 'assembly'];
+const monthLabel = (m = S.month) => { const [y, mm] = m.split('-').map(Number); return `${MONTH[mm - 1]} ${y}`; };
+const monthName = (m = S.month) => MONTH[Number(m.slice(5, 7)) - 1];
+function monthOptions() {
+  const set = new Set(S.ref.periods.map(p => p.s.slice(0, 7)));
+  set.add(localISO().slice(0, 7));
+  return [...set].sort().map(m => ({ key: m, label: monthLabel(m) }));
+}
+function monthRange(m = S.month) { const [y, mm] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}` }; }
+function viewAsOf() {
+  if (!MONTHLY.includes(S.tab)) return S.asOf;
+  const t = localISO(), e = monthRange().to;
+  return e < t ? e : t;
+}
+function setStatusLine() {
+  const a = viewAsOf(), r = monthRange(), t = localISO();
+  $('#inView').textContent = r.from > t ? `${monthLabel()} has not started; figures as of today, ${dlong(t)}`
+    : a === t ? `Figures as of today, ${dlong(t)}` : `Figures at month end, ${dlong(a)}`;
+}
+// Period series with a per-item cumulative gap: Σ over items of max(0, cumulative due − cumulative actual),
+// the same basis as the backlog and shortfall totals (a surplus on one item does not offset another item's gap).
+function buildSeries(items, asOf) {
+  const P = S.ref.periods, idx = new Map(P.map((p, i) => [p.s, i]));
+  const per = P.map(p => ({ ...p, plan: 0, due: 0, act: 0, gap: p.s <= asOf ? 0 : null }));
+  const byKey = new Map();
+  items.forEach(it => {
+    const i = idx.get(it.s); if (i == null) return;
+    per[i].plan += it.plan; per[i].due += it.due; per[i].act += it.act || 0;
+    if (!byKey.has(it.k)) byKey.set(it.k, P.map(() => ({ due: 0, act: 0 })));
+    const a = byKey.get(it.k)[i]; a.due += it.due; a.act += it.act || 0;
+  });
+  byKey.forEach(arr => { let cd = 0, ca = 0;
+    arr.forEach((a, i) => { cd += a.due; ca += a.act; if (per[i].gap != null) per[i].gap += Math.max(0, cd - ca); }); });
+  per.forEach(p => { if (p.gap != null) p.gap = Math.round(p.gap); });
+  return per;
+}
+// Same chart as the Overview delivery panel: planned bars, actual bars, dashed cumulative gap line.
+function tlSVG(per, asOf, { month = null, aria = 'Planned versus actual by period', gapWord = 'backlog' } = {}) {
+  const today = localISO();
+  const W = 1000, H = 230, L = 10, R = 10, T = 26, B = 46, cw = (W - L - R) / Math.max(1, per.length);
+  const max = Math.max(1, ...per.map(p => Math.max(p.plan, p.act, p.gap || 0)));
+  const y = v => T + (H - T - B) * (1 - v / max);
+  const bw = Math.min(46, cw * 0.32);
+  let svg = `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
+  per.forEach((p, i) => {
+    const x0 = L + i * cw, x = x0 + cw / 2, now = p.s <= asOf && p.e >= asOf, inM = month && p.s.slice(0, 7) === month;
+    if (inM && !now) svg += `<rect x="${x0}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#e9f4f9"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:var(--teal-d);font-weight:800">${monthName(month)}</text>`;
+    if (now) svg += `<rect x="${x0}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#fff7e6"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:#a8700b;font-weight:800">${asOf === today ? 'today' : 'as of ' + dshort(asOf)}</text>`;
+    svg += `<rect x="${x - bw - 2}" y="${y(p.plan)}" width="${bw}" height="${H - B - y(p.plan)}" rx="3" fill="#cfd9e1"/>`;
+    if (p.s <= asOf) svg += `<rect x="${x + 2}" y="${y(p.act)}" width="${bw}" height="${H - B - y(p.act)}" rx="3" fill="#2a9fc9"/>`;
+    svg += `<text class="v" x="${x - bw / 2 - 2}" y="${y(p.plan) - 5}" text-anchor="middle">${fmt(p.plan)}</text>`;
+    if (p.s <= asOf) svg += `<text class="v" x="${x + bw / 2 + 2}" y="${y(p.act) - 5}" text-anchor="middle" style="fill:var(--teal-d)">${fmt(p.act)}</text>`;
+    svg += `<text x="${x}" y="${H - B + 18}" text-anchor="middle">${dshort(p.s)} – ${dshort(p.e)}</text>`;
+    if (p.gap != null) svg += `<text x="${x}" y="${H - B + 36}" text-anchor="middle" style="fill:${p.gap > 0 ? '#c32d44' : '#157a52'};font-weight:800">${gapWord} ${fmt(p.gap)}</text>`;
+  });
+  const pts = per.map((p, i) => p.gap == null ? null : `${L + i * cw + cw / 2},${y(Math.max(0, p.gap))}`).filter(Boolean);
+  if (pts.length > 1) svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="#e5822b" stroke-width="2.5" stroke-dasharray="6 4"/>`;
+  pts.forEach(pt => { const [a, b] = pt.split(','); svg += `<circle cx="${a}" cy="${b}" r="4" fill="#e5822b"/>`; });
+  svg += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#dfe6ec"/></svg>`;
+  return `<div class="tbl-wrap"><div style="min-width:720px">${svg}</div></div>`;
+}
+// KPI strip + chart for a monthly view. lbl = { plan, act, gap, gapWord }
+function renderSeriesPanel(pfx, per, asOf, lbl, gapOverride) {
+  const inM = per.filter(p => p.s.slice(0, 7) === S.month);
+  const sum = (arr, k) => arr.reduce((a, p) => a + (p[k] || 0), 0);
+  const mPlan = sum(inM, 'plan'), mDue = sum(inM, 'due'), mAct = sum(inM.filter(p => p.s <= asOf), 'act');
+  const total = sum(per, 'plan'), cumDue = sum(per, 'due'), cumAct = sum(per.filter(p => p.s <= asOf), 'act');
+  const lastGap = [...per].reverse().find(p => p.gap != null)?.gap ?? 0;
+  const gap = gapOverride ?? lastGap, mn = monthName(), started = monthRange().from <= localISO();
+  $(`#${pfx}Kpis`).innerHTML = `
+    <div><span>${mn} ${lbl.plan.toLowerCase()}</span><b>${fmt(mPlan)}</b><small>${inM.length ? `${inM.length} delivery period${inM.length === 1 ? '' : 's'}` : 'No delivery period in this month'}</small></div>
+    <div><span>${mn} ${lbl.act.toLowerCase()}</span><b>${fmt(mAct)}</b><small>${!started ? 'Month not started' : mDue ? `${pct(mAct / mDue)} of ${fmt(mDue)} due in the month` : 'Nothing due in the month'}</small></div>
+    <div><span>${lbl.plan} by ${dshort(asOf)}</span><b>${fmt(cumDue)}</b><small>${pct(total ? cumDue / total : null)} of the scheduled ${fmt(total)}</small></div>
+    <div><span>${lbl.act} to date</span><b>${fmt(cumAct)}</b><small>${pct(cumDue ? cumAct / cumDue : null)} of ${lbl.plan.toLowerCase()} to date</small></div>
+    <div class="${gap ? 'bad' : ''}"><span>${lbl.gap}</span><b>${fmt(gap)}</b><small>Cumulative to ${dshort(asOf)}</small></div>`;
+  $(`#${pfx}Chart`).innerHTML = tlSVG(per, asOf, { month: S.month, aria: `${lbl.plan} versus ${lbl.act.toLowerCase()} by delivery period`, gapWord: lbl.gapWord });
+}
 
 /* ====================== rendering: overview ====================== */
 async function loadOverview() {
@@ -916,26 +1026,7 @@ function renderDeliveryStatus() {
     cp += dueHere; cd += p.del; p.gap = p.s <= S.asOf ? Math.max(0, Math.round(cp - cd)) : null;
     if (p.s <= S.asOf && p.e >= S.asOf) p.gap = Math.max(0, due - del);   // same basis as the KPIs (server-rounded)
   });
-  const W = 1000, H = 230, L = 10, R = 10, T = 26, B = 46, cw = (W - L - R) / Math.max(1, per.length);
-  const max = Math.max(1, ...per.map(p => Math.max(p.plan, p.del, p.gap || 0)));
-  const y = v => T + (H - T - B) * (1 - v / max), gy = y;
-  const bw = Math.min(46, cw * 0.32);
-  let svg = `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planned versus delivered by delivery period">`;
-  per.forEach((p, i) => {
-    const x = L + i * cw + cw / 2, now = p.s <= S.asOf && p.e >= S.asOf;
-    if (now) svg += `<rect x="${L + i * cw}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#fff7e6"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:#a8700b;font-weight:800">today</text>`;
-    svg += `<rect x="${x - bw - 2}" y="${y(p.plan)}" width="${bw}" height="${H - B - y(p.plan)}" rx="3" fill="#cfd9e1"/>`;
-    if (p.s <= S.asOf) svg += `<rect x="${x + 2}" y="${y(p.del)}" width="${bw}" height="${H - B - y(p.del)}" rx="3" fill="#2a9fc9"/>`;
-    svg += `<text class="v" x="${x - bw / 2 - 2}" y="${y(p.plan) - 5}" text-anchor="middle">${fmt(p.plan)}</text>`;
-    if (p.s <= S.asOf) svg += `<text class="v" x="${x + bw / 2 + 2}" y="${y(p.del) - 5}" text-anchor="middle" style="fill:var(--teal-d)">${fmt(p.del)}</text>`;
-    svg += `<text x="${x}" y="${H - B + 18}" text-anchor="middle">${dshort(p.s)} – ${dshort(p.e)}</text>`;
-    if (p.gap != null) svg += `<text x="${x}" y="${H - B + 36}" text-anchor="middle" style="fill:${p.gap > 0 ? '#c32d44' : '#157a52'};font-weight:800">backlog ${fmt(p.gap)}</text>`;
-  });
-  const pts = per.map((p, i) => p.gap == null ? null : `${L + i * cw + cw / 2},${gy(Math.max(0, p.gap)) }`).filter(Boolean);
-  if (pts.length > 1) svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="#e5822b" stroke-width="2.5" stroke-dasharray="6 4"/>`;
-  pts.forEach(pt => { const [a, b] = pt.split(','); svg += `<circle cx="${a}" cy="${b}" r="4" fill="#e5822b"/>`; });
-  svg += `<line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#dfe6ec"/></svg>`;
-  $('#dTimeline').innerHTML = `<div class="tbl-wrap"><div style="min-width:720px">${svg}</div></div>`;
+  $('#dTimeline').innerHTML = tlSVG(per.map(p => ({ ...p, act: p.del })), S.asOf, { aria: 'Planned versus delivered by delivery period' });
 
   const order = { critical: 0, at_risk: 1, on_track: 2, na: 3, complete: 4 };
   const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog);
@@ -977,16 +1068,36 @@ function mini(done, plan) {
 
 /* ====================== production ====================== */
 async function loadProduction() {
-  const [matrix, log, flow] = await Promise.all([
-    rpc('kayan_stage_matrix', { p_as_of: S.asOf }),
-    q(sb.from('kayan_production_entries').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
-    rpc('kayan_department_flow', { p_as_of: S.asOf }),
+  const A = viewAsOf(), r = monthRange();
+  const [matrix, log, flow, ser] = await Promise.all([
+    rpc('kayan_stage_matrix', { p_as_of: A }),
+    q(sb.from('kayan_production_entries').select('*').eq('deleted', false).gte('entry_date', r.from).lte('entry_date', r.to)
+      .order('entry_date', { ascending: false }).order('created_at', { ascending: false }).limit(1000)),
+    rpc('kayan_department_flow', { p_as_of: A }),
+    rpc('kayan_period_series', { p_as_of: A, p_lead_days: 0 }),
   ]);
-  S.matrix = matrix; S.flow = flow; S.prodLog = log; renderFlow(); renderProduction(log);
+  S.matrix = matrix; S.flow = flow; S.prodLog = log; S.pser = ser; renderFlow(); renderProduction(log);
+}
+function renderProdChart() {
+  const A = viewAsOf(), pids = productIds();
+  if (S.prodDept) S.pcDept = S.prodDept;
+  const st = S.pcDept;
+  $('#pcDept').innerHTML = Object.entries(DEPT).map(([k, v]) =>
+    `<button type="button" class="chip" data-pc="${k}" aria-pressed="${st === k}">${v}</button>`).join('');
+  $$('#pcDept .chip').forEach(b => b.onclick = () => { S.pcDept = b.dataset.pc; if (S.prodDept) { S.prodDept = S.pcDept; renderProduction(S.prodLog); } else renderProdChart(); });
+  const items = (S.pser?.stages || []).filter(x => x.st === st && (!pids || pids.includes(x.p)))
+    .map(x => ({ s: x.s, k: x.p, plan: x.plan, due: x.due, act: x.done || 0 }));
+  const per = buildSeries(items, A);
+  $('#pcEyebrow').textContent = `${DEPT[st]} by delivery period`;
+  renderSeriesPanel('pc', per, A, { plan: 'Planned', act: 'Output', gap: 'Output backlog', gapWord: 'backlog' });
+  $('#pcHint').textContent = `Planned = client delivery plan of the models that pass through ${DEPT[st].toLowerCase()}, per period; the period containing the status date is pro-rated by days. ` +
+    `Output = complete units (sets) finished in the period. Backlog = Σ per model of max(0, plan due − output), cumulative. ` +
+    `Contract quantity with no delivery date (Spanish chair) is not in the plan bars.`;
 }
 function renderProduction(log) {
   const pids = productIds();
-  renderProdCards();
+  renderProdCards(); renderProdChart();
+  $('#prodLogTitle').textContent = `Production entries in ${monthLabel()}`;
   if (S.prodDept) log = log.filter(r => r.stage === S.prodDept);
   const byP = new Map();
   S.matrix.forEach(m => { if (!byP.has(m.product_id)) byP.set(m.product_id, {}); byP.get(m.product_id)[m.stage] = m; });
@@ -1005,7 +1116,7 @@ function renderProduction(log) {
     const toggle = () => { const r = $(`#matrixTbl tr[data-for="${tr.dataset.pid}"]`); r.hidden = !r.hidden; };
     tr.onclick = toggle; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
   });
-  renderLog('#prodLog', log.filter(r => !pids || pids.includes(r.product_id)), 'production');
+  renderLog('#prodLog', log.filter(r => !pids || pids.includes(r.product_id)), 'production', `No production recorded in ${monthLabel()}.`);
 }
 function renderProdCards() {
   const pids = productIds();
@@ -1074,11 +1185,26 @@ function compDetail(s, cols) {
 
 /* ====================== materials ====================== */
 async function loadMaterials() {
-  const [st, log] = await Promise.all([
-    rpc('kayan_material_status', { p_as_of: S.asOf, p_lead_days: S.matLead }),
-    q(sb.from('kayan_material_txns').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
+  const A = viewAsOf(), r = monthRange();
+  const [st, log, ser] = await Promise.all([
+    rpc('kayan_material_status', { p_as_of: A, p_lead_days: S.matLead }),
+    q(sb.from('kayan_material_txns').select('*').eq('deleted', false).gte('txn_date', r.from).lte('txn_date', r.to)
+      .order('txn_date', { ascending: false }).order('created_at', { ascending: false }).limit(1000)),
+    rpc('kayan_period_series', { p_as_of: A, p_lead_days: S.matLead }),
   ]);
-  S.matStatus_ = st; renderMaterials(log);
+  S.matStatus_ = st; S.mser = ser; renderMaterials(log);
+}
+function renderMatChart(rows) {
+  const A = viewAsOf(), ids = new Set(rows.map(r => r.material_id));
+  const items = (S.mser?.materials || []).filter(x => ids.has(x.m))
+    .map(x => ({ s: x.s, k: x.m, plan: Number(x.req), due: Number(x.due), act: Number(x.sup || 0) }));
+  const per = buildSeries(items, A);
+  const shortTD = rows.reduce((a, r) => a + Number(r.shortfall), 0);
+  renderSeriesPanel('mc', per, A, { plan: 'Required', act: 'Supplied', gap: 'Shortfall to date', gapWord: 'short' }, Math.round(shortTD));
+  const uoms = [...new Set(rows.map(r => r.uom).filter(Boolean))];
+  $('#mcHint').textContent = `Required = planned qty × units due in the period ÷ department plan${S.matLead ? `, shifted ${S.matLead} days earlier for lead time` : ''}. ` +
+    `Supplied = receipts + adjustments dated in the period. Shortfall = Σ per material of max(0, required − supplied), cumulative. ` +
+    (uoms.length > 1 ? `Totals add ${uoms.length} different units (${uoms.join(', ')}); select one department or product to compare like with like.` : '');
 }
 function renderMaterials(log) {
   const pids = productIds();
@@ -1088,13 +1214,15 @@ function renderMaterials(log) {
     .map(([k, v]) => `<button type="button" class="chip" data-d="${k}" aria-pressed="${(S.matDept || '') === k}">${v}</button>`).join('');
   $$('#deptChips .chip').forEach(b => b.onclick = () => { S.matDept = b.dataset.d; renderMaterials(log); });
   if (S.matDept) rows = rows.filter(r => r.stages.includes(S.matDept));
+  renderMatChart(rows);
+  $('#matLogTitle').textContent = `Material movements in ${monthLabel()}`;
   const c = { zero: 0, short: 0, covered: 0, complete: 0 }; rows.forEach(r => c[r.status]++);
   const reqTD = rows.reduce((a, r) => a + Number(r.required_to_date), 0);
   const shortTD = rows.reduce((a, r) => a + Number(r.shortfall), 0);
   const nShort = rows.filter(r => r.shortfall > 0).length;
   $('#mShortPct').textContent = reqTD ? pct(shortTD / reqTD) : 'N/A';
   $('#mShortSub').innerHTML = reqTD
-    ? `${fmt(shortTD)} of ${fmt(reqTD)} required by ${dshort(S.asOf)}${S.matLead ? ` (+${S.matLead}d lead)` : ''}<br>${nShort} material${nShort === 1 ? '' : 's'} short of the date requirement`
+    ? `${fmt(shortTD)} of ${fmt(reqTD)} required by ${dshort(viewAsOf())}${S.matLead ? ` (+${S.matLead}d lead)` : ''}<br>${nShort} material${nShort === 1 ? '' : 's'} short of the date requirement`
     : 'Nothing required by this date yet';
   $('#mZero').textContent = c.zero; $('#mShort').textContent = c.short;
   $('#mCovered').textContent = c.covered + c.complete;
@@ -1116,20 +1244,34 @@ function renderMaterials(log) {
       <td class="n" ${m.shortfall > 0 ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt2(m.shortfall)}</td>
       <td class="n" ${m.shortfall_pct >= 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${m.shortfall_pct == null ? '<span class="muted">—</span>' : pct(m.shortfall_pct, 0)}</td></tr>`).join('') ||
       '<tr><td colspan="13" class="empty-state">No materials match.</td></tr>') + '</tbody>';
-  renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material');
+  renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material', `No material movements recorded in ${monthLabel()}.`);
 }
 
 /* ====================== assembly & delivery ====================== */
 async function loadAssembly() {
+  const A = viewAsOf(), r = monthRange();
   const [dm, log, dash, flow, dstat] = await Promise.all([
-    rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
-    q(sb.from('kayan_deliveries').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
+    rpc('kayan_delivery_matrix', { p_as_of: A }),
+    q(sb.from('kayan_deliveries').select('*').eq('deleted', false).gte('delivery_date', r.from).lte('delivery_date', r.to)
+      .order('delivery_date', { ascending: false }).order('created_at', { ascending: false }).limit(1000)),
     rpc('kayan_dashboard', { p_stage: 'assembly', p_from: S.ref.periods[0]?.s || S.from, p_to: S.ref.periods.at(-1)?.e || S.to,
-      p_as_of: S.asOf, p_product_ids: productIds(), p_risk: null }),
-    rpc('kayan_department_flow', { p_as_of: S.asOf }),
-    rpc('kayan_delivery_status', { p_as_of: S.asOf }),
+      p_as_of: A, p_product_ids: productIds(), p_risk: null }),
+    rpc('kayan_department_flow', { p_as_of: A }),
+    rpc('kayan_delivery_status', { p_as_of: A }),
   ]);
   S.dm = dm; S.flow = flow; S.dstat = dstat; renderAssembly(log, dash);
+}
+function renderAsmChart(ds) {
+  const A = viewAsOf(), pids = productIds();
+  const days = (a, b) => (parseISO(b) - parseISO(a)) / 864e5 + 1;
+  const items = S.dm.filter(r => !pids || pids.includes(r.product_id)).map(r => ({
+    s: r.period_start, k: r.product_id, plan: r.planned, act: r.period_start <= A ? r.delivered : 0,
+    due: r.period_end <= A ? r.planned : r.period_start <= A ? r.planned * days(r.period_start, A) / days(r.period_start, r.period_end) : 0 }));
+  const per = buildSeries(items, A);
+  const back = ds.reduce((a, r) => a + r.backlog, 0);   // server basis, same as the Backlog card
+  const cur = per.find(p => p.s <= A && p.e >= A); if (cur) cur.gap = back;
+  renderSeriesPanel('ac', per, A, { plan: 'Planned', act: 'Delivered', gap: 'Delivery backlog', gapWord: 'backlog' }, back);
+  $('#acHint').textContent = 'Same basis as the Overview delivery panel: client delivery schedule per period, the period containing the status date pro-rated by days. Backlog = Σ per model of max(0, plan due − delivered), cumulative.';
 }
 function renderAssembly(log, dash) {
   const pids = productIds();
@@ -1140,6 +1282,9 @@ function renderAssembly(log, dash) {
   // same server-side basis as the Overview delivery panel
   const ds = S.dstat.filter(r => !pids || pids.includes(r.product_id));
   const dueToDate = ds.reduce((a, r) => a + r.due, 0);
+  const A = viewAsOf();
+  renderAsmChart(ds);
+  $('#delLogTitle').textContent = `Client deliveries in ${monthLabel()}`;
   $('#aDone').innerHTML = `${fmt(dash.assembly.done)} <small>/</small> ${fmt(dash.assembly.scope)}`;
   const ready = S.flow.filter(r => !pids || pids.includes(r.product_id)).reduce((a, r) => a + (r.ready_to_assemble || 0), 0);
   $('#aDoneSub').textContent = `${pct(dash.assembly.scope ? dash.assembly.done / dash.assembly.scope : null)} of assembly scope · ${fmt(ready)} ready to assemble from chassis + foam`;
@@ -1147,17 +1292,17 @@ function renderAssembly(log, dash) {
   $('#aDelSub').textContent = `${pct(contract ? delivered / contract : null)} of contract quantity`;
   const back = ds.reduce((a, r) => a + r.backlog, 0);
   $('#aBack').textContent = fmt(back);
-  $('#aBackSub').textContent = `Plan due by ${dshort(S.asOf)}: ${fmt(dueToDate)} · delivered ${fmt(delivered)}`;
+  $('#aBackSub').textContent = `Plan due by ${dshort(A)}: ${fmt(dueToDate)} · delivered ${fmt(delivered)}`;
   const byP = new Map(); rows.forEach(r => { if (!byP.has(r.product_id)) byP.set(r.product_id, {}); byP.get(r.product_id)[r.period_start] = r; });
   const prods = S.ref.products.filter(p => !pids || pids.includes(p.id));
   const cls = (r, p) => {
     if (!r || (!r.planned && !r.delivered)) return 'empty';
-    if (p.s > S.asOf) return 'future';
-    if (p.e >= S.asOf) return 'current';
+    if (p.s > A) return 'future';
+    if (p.e >= A) return 'current';
     return r.delivered >= r.planned ? 'met' : 'short';
   };
   const tot = periods.map(p => ({ plan: 0, del: 0 }));
-  $('#dmTbl').innerHTML = `<thead><tr><th>Product</th>${periods.map(p => `<th class="n">${dshort(p.s)}–${dshort(p.e)}</th>`).join('')}<th class="n">Plan total</th><th class="n">Contract</th></tr></thead><tbody>` +
+  $('#dmTbl').innerHTML = `<thead><tr><th>Product</th>${periods.map(p => `<th class="n" ${p.s.slice(0, 7) === S.month ? 'style="background:#e9f4f9;color:var(--teal-d)"' : ''}>${dshort(p.s)}–${dshort(p.e)}</th>`).join('')}<th class="n">Plan total</th><th class="n">Contract</th></tr></thead><tbody>` +
     prods.map(p => { const m = byP.get(p.id) || {}; let pt = 0;
       return `<tr><td class="pname"><b>${esc(p.name_en)}</b></td>${periods.map((per, i) => { const r = m[per.s];
         if (r) { tot[i].plan += r.planned; tot[i].del += r.delivered; pt += r.planned; }
@@ -1165,11 +1310,11 @@ function renderAssembly(log, dash) {
         return `<td class="cell ${c}" title="${r?.note ? esc(r.note) : ''}">${c === 'empty' ? (r?.note ? esc(r.note) : '·') : `${fmt(r.delivered)} / ${fmt(r.planned)}`}</td>`; }).join('')}
         <td class="n">${fmt(pt)}</td><td class="n ${pt !== p.total_qty ? '' : ''}" ${pt !== p.total_qty ? `style="color:var(--red);font-weight:800" title="Scheduled ${fmt(pt)} vs contract ${fmt(p.total_qty)}"` : ''}>${fmt(p.total_qty)}</td></tr>`; }).join('') +
     `<tr><td><b>Total</b></td>${tot.map(t => `<td class="cell"><b>${fmt(t.del)} / ${fmt(t.plan)}</b></td>`).join('')}<td class="n"><b>${fmt(tot.reduce((a, t) => a + t.plan, 0))}</b></td><td class="n"><b>${fmt(contract)}</b></td></tr></tbody>`;
-  renderLog('#delLog', log.filter(r => !pids || pids.includes(r.product_id)), 'delivery');
+  renderLog('#delLog', log.filter(r => !pids || pids.includes(r.product_id)), 'delivery', `No client deliveries recorded in ${monthLabel()}.`);
 }
 
 /* ====================== logs & voids ====================== */
-function renderLog(sel, rows, kind) {
+function renderLog(sel, rows, kind, emptyMsg) {
   const comp = id => S.ref.components.find(c => c.id === id)?.name_ar;
   const mat = id => S.ref.materials.find(m => m.id === id)?.name_ar;
   const head = { production: '<th>Date</th><th>Product</th><th>Stage</th><th>Part</th><th class="n">Qty</th><th class="n">Scrap</th><th>Shift</th><th>By</th><th>Note</th><th></th>',
@@ -1186,7 +1331,7 @@ function renderLog(sel, rows, kind) {
       <td class="ar" style="text-align:right">${esc(mat(r.material_id))}</td><td class="n">${fmt2(r.txn_type === 'issue' ? -r.qty : r.qty)}</td>
       <td>${r.product_id ? esc(pname(r.product_id)) : ''}</td><td>${esc(r.reference || '')}</td><td>${esc(r.recorded_by || '')}</td>${v}</tr>`;
   }).join('');
-  $(sel).innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="10" class="empty-state">Nothing recorded yet. Use + Record to add the first entry.</td></tr>`}</tbody>`;
+  $(sel).innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="10" class="empty-state">${esc(emptyMsg || 'Nothing recorded yet. Use + Record to add the first entry.')}</td></tr>`}</tbody>`;
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-void]'); if (!b) return;
@@ -1605,9 +1750,10 @@ function showTab(tab) {
   $$('nav.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
   $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== tab);
   $$('#filters [data-for=overview]').forEach(el => el.style.display = tab === 'overview' ? '' : 'none');
+  $$('#filters [data-for=monthly]').forEach(el => el.style.display = MONTHLY.includes(tab) ? '' : 'none');
   $('#filters').hidden = tab === 'record';
   if (tab === 'overview') $('#customRange').classList.toggle('on', S.period === 'custom');
-  $('#inView').hidden = tab !== 'overview';
+  $('#inView').hidden = tab === 'record';
   refresh();
 }
 let refreshing = null, again = false;
@@ -1622,6 +1768,7 @@ async function refresh() {
       if (S.tab === 'production') await loadProduction();
       if (S.tab === 'materials') await loadMaterials();
       if (S.tab === 'assembly') await loadAssembly();
+      if (MONTHLY.includes(S.tab)) setStatusLine();
       if (S.tab === 'record') { renderApprovals(); buildRecordForms(); }
     } catch (e) { banner('Could not load data: ' + errMsg(e)); }
     finally { main.classList.remove('loading'); refreshing = null; if (again) { again = false; refresh(); } }
@@ -1630,11 +1777,12 @@ async function refresh() {
 }
 function initFilters() {
   $('#fAsOf').value = S.asOf;
-  ['#fProduct', '#fRisk', '#fStage', '#fPeriod', '#fFrom', '#fTo', '#fAsOf'].forEach(id =>
+  ['#fProduct', '#fRisk', '#fStage', '#fPeriod', '#fFrom', '#fTo', '#fAsOf', '#fMonth'].forEach(id =>
     $(id).addEventListener('change', () => { readFilters(); refresh(); }));
   $('#resetBtn').addEventListener('click', () => {
     $('#fProduct').value = ''; $('#fRisk').value = ''; $('#fStage').value = 'chassis';
     S.asOf = localISO(); $('#fAsOf').value = S.asOf; S.period = defaultPeriodKey(periodOptions()); $('#fPeriod').value = S.period;
+    S.month = localISO().slice(0, 7); $('#fMonth').value = S.month;
     readFilters(); refresh();
   });
   $$('nav.tabs [role=tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
