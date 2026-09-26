@@ -189,6 +189,8 @@ form select,form input,form textarea{font-size:16px;min-height:46px;padding:10px
 .kpis b{display:block;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:4px}
 .kpis small{color:var(--muted);font-size:13px}
 .kpis .bad b{color:var(--red)}
+.kpis.six{grid-template-columns:repeat(6,1fr)}
+@media (max-width:1100px){.kpis.six{grid-template-columns:repeat(3,1fr)}.kpis.six div:nth-child(4){border-left:0}.kpis.six div:nth-child(n+4){border-top:1px solid var(--line)}}
 .tl{width:100%;height:auto;display:block}
 .tl text{font-family:var(--font);fill:#56677a;font-size:12px}
 .tl .v{fill:var(--ink);font-weight:800}
@@ -233,6 +235,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   nav.tabs button{font-size:16px;padding:16px 10px 14px}
   .cards,.cards.three,.forms{grid-template-columns:1fr}
   .kpis{grid-template-columns:1fr 1fr}.kpis div{border-left:0;border-top:1px solid var(--line)}
+  .kpis.six{grid-template-columns:1fr 1fr}.kpis.six div{border-left:0;border-top:1px solid var(--line)}
   .recbar .hint{margin-left:0}
   .filters .field,.filters select,.filters input,.filters .product select{width:100%;min-width:0}
   .inview{margin-left:0;padding:0}
@@ -861,8 +864,8 @@ function productIds() { return S.product ? [Number(S.product)] : null; }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
 
 /* ====================== month filter (production / materials / assembly) ====================== */
-// These views take a month instead of a day. Status date = month end, or today while the month is running
-// (a future month shows today's status, with that month highlighted in the charts).
+// These views take a month instead of a day. Status date = last day of the selected month, always:
+// plan is counted to month end, actuals are whatever has been recorded (nothing after today).
 const MONTHLY = ['production', 'materials', 'assembly'];
 const monthLabel = (m = S.month) => { const [y, mm] = m.split('-').map(Number); return `${MONTH[mm - 1]} ${y}`; };
 const monthName = (m = S.month) => MONTH[Number(m.slice(5, 7)) - 1];
@@ -872,15 +875,11 @@ function monthOptions() {
   return [...set].sort().map(m => ({ key: m, label: monthLabel(m) }));
 }
 function monthRange(m = S.month) { const [y, mm] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}` }; }
-function viewAsOf() {
-  if (!MONTHLY.includes(S.tab)) return S.asOf;
-  const t = localISO(), e = monthRange().to;
-  return e < t ? e : t;
-}
+function viewAsOf() { return MONTHLY.includes(S.tab) ? monthRange().to : S.asOf; }
+function prevMonth(m = S.month) { const [y, mm] = m.split('-').map(Number); return mm === 1 ? `${y - 1}-12` : `${y}-${pad(mm - 1)}`; }
 function setStatusLine() {
-  const a = viewAsOf(), r = monthRange(), t = localISO();
-  $('#inView').textContent = r.from > t ? `${monthLabel()} has not started; figures as of today, ${dlong(t)}`
-    : a === t ? `Figures as of today, ${dlong(t)}` : `Figures at month end, ${dlong(a)}`;
+  const a = viewAsOf(), t = localISO();
+  $('#inView').textContent = a > t ? `Figures to ${dlong(a)}; entries recorded up to today, ${dlong(t)}` : `Figures to ${dlong(a)}`;
 }
 // Period series with a per-item cumulative gap: Σ over items of max(0, cumulative due − cumulative actual),
 // the same basis as the backlog and shortfall totals (a surplus on one item does not offset another item's gap).
@@ -925,19 +924,25 @@ function tlSVG(per, asOf, { month = null, aria = 'Planned versus actual by perio
   return `<div class="tbl-wrap"><div style="min-width:720px">${svg}</div></div>`;
 }
 // KPI strip + chart for a monthly view. lbl = { plan, act, gap, gapWord }
+// Carried in = cumulative gap at the end of the previous month (last period of that month).
 function renderSeriesPanel(pfx, per, asOf, lbl, gapOverride) {
   const inM = per.filter(p => p.s.slice(0, 7) === S.month);
+  const pm = prevMonth(), inPrev = per.filter(p => p.s.slice(0, 7) === pm);
   const sum = (arr, k) => arr.reduce((a, p) => a + (p[k] || 0), 0);
-  const mPlan = sum(inM, 'plan'), mDue = sum(inM, 'due'), mAct = sum(inM.filter(p => p.s <= asOf), 'act');
-  const total = sum(per, 'plan'), cumDue = sum(per, 'due'), cumAct = sum(per.filter(p => p.s <= asOf), 'act');
+  const mPlan = sum(inM, 'plan'), mAct = sum(inM, 'act');
+  const cumDue = sum(per, 'due'), cumAct = sum(per.filter(p => p.s <= asOf), 'act');
   const lastGap = [...per].reverse().find(p => p.gap != null)?.gap ?? 0;
-  const gap = gapOverride ?? lastGap, mn = monthName(), started = monthRange().from <= localISO();
+  const gap = gapOverride ?? lastGap, mn = monthName(), pn = monthName(pm);
+  const carried = inPrev.length ? (inPrev.at(-1).gap ?? 0) : 0;
+  const target = carried + mPlan;
+  $(`#${pfx}Kpis`).className = 'kpis six';
   $(`#${pfx}Kpis`).innerHTML = `
+    <div class="${carried ? 'bad' : ''}"><span>${lbl.gap} from ${pn}</span><b>${fmt(carried)}</b><small>${inPrev.length ? `Open at ${dshort(inPrev.at(-1).e)}, carried into ${mn}` : `No plan in ${pn}`}</small></div>
     <div><span>${mn} ${lbl.plan.toLowerCase()}</span><b>${fmt(mPlan)}</b><small>${inM.length ? `${inM.length} delivery period${inM.length === 1 ? '' : 's'}` : 'No delivery period in this month'}</small></div>
-    <div><span>${mn} ${lbl.act.toLowerCase()}</span><b>${fmt(mAct)}</b><small>${!started ? 'Month not started' : mDue ? `${pct(mAct / mDue)} of ${fmt(mDue)} due in the month` : 'Nothing due in the month'}</small></div>
-    <div><span>${lbl.plan} by ${dshort(asOf)}</span><b>${fmt(cumDue)}</b><small>${pct(total ? cumDue / total : null)} of the scheduled ${fmt(total)}</small></div>
-    <div><span>${lbl.act} to date</span><b>${fmt(cumAct)}</b><small>${pct(cumDue ? cumAct / cumDue : null)} of ${lbl.plan.toLowerCase()} to date</small></div>
-    <div class="${gap ? 'bad' : ''}"><span>${lbl.gap}</span><b>${fmt(gap)}</b><small>Cumulative to ${dshort(asOf)}</small></div>`;
+    <div><span>${mn} total to cover</span><b>${fmt(target)}</b><small>${fmt(carried)} carried in + ${fmt(mPlan)} plan</small></div>
+    <div><span>${mn} ${lbl.act.toLowerCase()}</span><b>${fmt(mAct)}</b><small>${target ? `${pct(mAct / target)} of the total to cover` : 'Nothing to cover this month'}</small></div>
+    <div><span>${lbl.act} to date</span><b>${fmt(cumAct)}</b><small>${pct(cumDue ? cumAct / cumDue : null)} of ${fmt(cumDue)} ${lbl.plan.toLowerCase()} to ${dshort(asOf)}</small></div>
+    <div class="${gap ? 'bad' : ''}"><span>${lbl.gap} at ${dshort(asOf)}</span><b>${fmt(gap)}</b><small>${gap - carried > 0 ? `+${fmt(gap - carried)}` : gap - carried < 0 ? `−${fmt(carried - gap)}` : 'No change'} vs end of ${pn}</small></div>`;
   $(`#${pfx}Chart`).innerHTML = tlSVG(per, asOf, { month: S.month, aria: `${lbl.plan} versus ${lbl.act.toLowerCase()} by delivery period`, gapWord: lbl.gapWord });
 }
 
