@@ -979,12 +979,13 @@ function mini(done, plan) {
 
 /* ====================== production ====================== */
 async function loadProduction() {
-  const [matrix, log, flow] = await Promise.all([
+  const [matrix, log, flow, dstat] = await Promise.all([
     rpc('kayan_stage_matrix', { p_as_of: S.asOf }),
     q(sb.from('kayan_production_entries').select('*').eq('deleted', false).order('created_at', { ascending: false }).limit(60)),
     rpc('kayan_department_flow', { p_as_of: S.asOf }),
+    rpc('kayan_delivery_status', { p_as_of: S.asOf }),
   ]);
-  S.matrix = matrix; S.flow = flow; S.prodLog = log; renderFlow(); renderProduction(log);
+  S.matrix = matrix; S.flow = flow; S.prodLog = log; S.dstat = dstat; renderFlow(); renderProduction(log);
 }
 function renderProduction(log) {
   const pids = productIds();
@@ -1001,13 +1002,19 @@ function renderProduction(log) {
   const cols = pi ? [pi.c.stage] : S.prodDept ? [S.prodDept] : ['chassis', 'foam', 'assembly'];
   const shown = pi ? prods.filter(p => p.id === pi.c.product_id)
     : prods.filter(p => !S.prodDept || (byP.get(p.id) || {})[S.prodDept]);
-  $('#matrixTbl').innerHTML = `<thead><tr><th>Product</th>${cols.map(c => `<th>${DEPT[c]}</th>`).join('')}<th class="n">Scrap</th><th class="n">Contract</th></tr></thead><tbody>` +
+  const oneDept = cols.length === 1;
+  $('#matrixTbl').innerHTML = `<thead><tr><th>Product</th>${cols.map(c => `<th>${DEPT[c]}</th>`).join('')}` +
+    (oneDept ? `<th class="n">Due by ${dshort(S.asOf)}</th><th class="n">vs due</th>` : '') +
+    `<th class="n">Scrap</th><th class="n">Contract</th></tr></thead><tbody>` +
     (shown.map(p => { const s = byP.get(p.id) || {};
       const scrap = cols.reduce((a, c) => a + (s[c]?.scrap || 0), 0);
       return `<tr class="click" data-pid="${p.id}" tabindex="0"><td class="pname"><b>${esc(p.name_en)}</b><span class="ar">${esc(p.name_ar)}</span></td>
-        ${cols.map(c => `<td>${cell(s[c])}</td>`).join('')}<td class="n">${fmt(scrap)}</td><td class="n">${fmt(p.total_qty)}</td></tr>
-        <tr class="comp-row" data-for="${p.id}" ${pi ? '' : 'hidden'}><td colspan="${cols.length + 3}">${compDetail(s, cols)}</td></tr>`; }).join('') ||
-      `<tr><td colspan="${cols.length + 3}" class="empty-state">No products in this department.</td></tr>`) + '</tbody>';
+        ${cols.map(c => `<td>${cell(s[c])}</td>`).join('')}${oneDept ? (() => {
+          const du = dueUnits(p.id, cols[0]), dn = s[cols[0]]?.done || 0;
+          return `<td class="n">${du == null ? '<span class="muted">—</span>' : fmt(du)}</td>
+            <td class="n" ${du && dn < du ? 'style="color:var(--red);font-weight:800"' : ''}>${du ? pct(dn / du) : '<span class="muted">—</span>'}</td>`; })() : ''}<td class="n">${fmt(scrap)}</td><td class="n">${fmt(p.total_qty)}</td></tr>
+        <tr class="comp-row" data-for="${p.id}" ${pi ? '' : 'hidden'}><td colspan="${cols.length + (oneDept ? 5 : 3)}">${compDetail(s, cols)}</td></tr>`; }).join('') ||
+      `<tr><td colspan="${cols.length + (oneDept ? 5 : 3)}" class="empty-state">No products in this department.</td></tr>`) + '</tbody>';
   $$('#matrixTbl tr.click').forEach(tr => {
     const toggle = () => { const r = $(`#matrixTbl tr[data-for="${tr.dataset.pid}"]`); r.hidden = !r.hidden; };
     tr.onclick = toggle; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
@@ -1038,6 +1045,13 @@ function partInfo() {
   const cd = m?.components.find(x => x.id === c.id);
   return { c, m, done: cd?.done || 0, planned: cd?.planned || c.planned_qty };
 }
+// Units due by the as-of date = client delivery plan to date, capped at the department plan.
+function dueUnits(product_id, stage) {
+  const d = (S.dstat || []).find(r => r.product_id === product_id);
+  const ps = S.ref.stages.find(x => x.product_id === product_id && x.stage === stage);
+  if (!d || !ps) return null;
+  return Math.min(d.due, ps.planned_qty);
+}
 function renderProdCards() {
   const pi = partInfo();
   if (pi) {
@@ -1049,7 +1063,11 @@ function renderProdCards() {
     $('#prodCards').className = 'cards';
     $('#prodCards').innerHTML = `
       <article class="card"><h3>Part output</h3><div class="metric">${fmt(pi.done)} <small>/ ${fmt(pi.planned)}</small></div>
-        <div class="sub"><span class="ar">${esc(pi.c.name_ar)}</span> · ${pct(pi.planned ? pi.done / pi.planned : null)} of the part plan</div></article>
+        <div class="sub"><span class="ar">${esc(pi.c.name_ar)}</span> · ${pct(pi.planned ? pi.done / pi.planned : null)} of the part plan${(() => {
+          const du = dueUnits(pi.c.product_id, pi.c.stage); if (du == null) return '';
+          const need = Math.round(du * per);
+          return `<br>Due by ${dshort(S.asOf)}: ${fmt(need)} · ${pct(need ? pi.done / need : null)}${need > pi.done ? ` · ${fmt(need - pi.done)} behind` : ''}`;
+        })()}</div></article>
       <article class="card amber"><h3>Chairs covered by this part</h3><div class="metric">${fmt(chairs)}</div>
         <div class="sub">${per === 1 ? '1 per chair' : `${per} per chair`} · product complete units: ${fmt(sets)}</div></article>
       <article class="card ${binding ? 'red' : ''}"><h3>${binding ? 'Behind the other parts' : 'Ahead of the other parts'}</h3>
@@ -1069,7 +1087,8 @@ function renderDeptCards() {
   const F = S.flow.filter(r => !pids || pids.includes(r.product_id));
   const agg = st => {
     const rows = M.filter(m => m.stage === st);
-    return { plan: rows.reduce((a, m) => a + m.planned, 0), done: rows.reduce((a, m) => a + m.done, 0),
+    return { due: rows.reduce((a, m) => a + (dueUnits(m.product_id, st) || 0), 0),
+      plan: rows.reduce((a, m) => a + m.planned, 0), done: rows.reduce((a, m) => a + m.done, 0),
       scrap: rows.reduce((a, m) => a + m.scrap, 0), models: rows.length, active: rows.filter(m => m.done > 0).length,
       wip: F.reduce((a, r) => a + (r[st + '_wip'] || 0), 0), ready: F.reduce((a, r) => a + (r.ready_to_assemble || 0), 0) };
   };
@@ -1080,8 +1099,8 @@ function renderDeptCards() {
   $$('#prodDept .chip').forEach(b => b.onclick = () => { S.prodDept = b.dataset.pd; S.part = ''; renderProduction(S.prodLog); });
   const card = (st, cls) => { const a = agg(st);
     return `<article class="card ${cls}"><h3>${DEPT[st]}</h3><div class="metric">${fmt(a.done)} <small>/ ${fmt(a.plan)}</small></div>
-      <div class="sub">${pct(a.plan ? a.done / a.plan : null)} complete · ${a.active}/${a.models} models started<br>
-      ${st === 'assembly' ? `Ready to assemble: ${fmt(a.ready)}` : `WIP waiting for assembly: ${fmt(a.wip)}`} · scrap ${fmt(a.scrap)}</div></article>`; };
+      <div class="sub">${pct(a.plan ? a.done / a.plan : null)} of full order · <b style="color:${a.due && a.done < a.due ? 'var(--red)' : 'var(--ink)'}">${pct(a.due ? a.done / a.due : null)}</b> of ${fmt(a.due)} due by ${dshort(S.asOf)}<br>
+      ${a.active}/${a.models} models started · ${st === 'assembly' ? `ready to assemble ${fmt(a.ready)}` : `WIP ${fmt(a.wip)}`} · scrap ${fmt(a.scrap)}</div></article>`; };
   if (!S.prodDept) {
     $('#prodCards').className = 'cards three';
     $('#prodCards').innerHTML = card('chassis', '') + card('foam', 'amber') + card('assembly', 'amber');
@@ -1089,10 +1108,12 @@ function renderDeptCards() {
     const st = S.prodDept, a = agg(st), behind = F.filter(r => r[st + '_plan'] && r[st + '_done'] === 0).length;
     $('#prodCards').className = 'cards';
     $('#prodCards').innerHTML = `
-      <article class="card"><h3>${DEPT[st]} output</h3><div class="metric">${fmt(a.done)} <small>/ ${fmt(a.plan)}</small></div><div class="sub">${pct(a.plan ? a.done / a.plan : null)} of department scope</div></article>
+      <article class="card"><h3>${DEPT[st]} output</h3><div class="metric">${fmt(a.done)} <small>/ ${fmt(a.plan)}</small></div><div class="sub">${pct(a.plan ? a.done / a.plan : null)} of the full order</div></article>
+      <article class="card ${a.due && a.done < a.due ? 'red' : 'amber'}"><h3>Against plan due by ${dshort(S.asOf)}</h3>
+        <div class="metric">${fmt(a.done)} <small>/ ${fmt(a.due)}</small></div>
+        <div class="sub">${pct(a.due ? a.done / a.due : null)} of what the delivery schedule needs by this date${a.due > a.done ? ` · ${fmt(a.due - a.done)} behind` : ''}</div></article>
       <article class="card amber"><h3>${st === 'assembly' ? 'Ready to assemble' : 'WIP waiting for assembly'}</h3><div class="metric">${fmt(st === 'assembly' ? a.ready : a.wip)}</div>
-        <div class="sub">${st === 'assembly' ? 'Chassis + foam sets available now' : 'Produced here, not yet assembled'}</div></article>
-      <article class="card amber"><h3>Models started</h3><div class="metric">${a.active} <small>/ ${a.models}</small></div><div class="sub">${behind} model${behind === 1 ? '' : 's'} with no output yet</div></article>
+        <div class="sub">${st === 'assembly' ? 'Chassis + foam sets available now' : 'Produced here, not yet assembled'} · ${a.active}/${a.models} models started, ${behind} not begun</div></article>
       <article class="card red"><h3>Scrap</h3><div class="metric">${fmt(a.scrap)}</div><div class="sub">${pct(a.done + a.scrap ? a.scrap / (a.done + a.scrap) : null, 2)} of units produced</div></article>`;
   }
 }
@@ -1198,7 +1219,10 @@ function renderAssembly(log, dash) {
   const dueToDate = ds.reduce((a, r) => a + r.due, 0);
   $('#aDone').innerHTML = `${fmt(dash.assembly.done)} <small>/</small> ${fmt(dash.assembly.scope)}`;
   const ready = S.flow.filter(r => !pids || pids.includes(r.product_id)).reduce((a, r) => a + (r.ready_to_assemble || 0), 0);
-  $('#aDoneSub').textContent = `${pct(dash.assembly.scope ? dash.assembly.done / dash.assembly.scope : null)} of assembly scope · ${fmt(ready)} ready to assemble from chassis + foam`;
+  const asmDue = S.ref.stages.filter(x => x.stage === 'assembly' && (!pids || pids.includes(x.product_id)))
+    .reduce((a, x) => a + (dueUnits(x.product_id, 'assembly') || 0), 0);
+  $('#aDoneSub').innerHTML = `${pct(dash.assembly.scope ? dash.assembly.done / dash.assembly.scope : null)} of the full order · ${fmt(ready)} ready to assemble<br>
+    Due by ${dshort(S.asOf)}: ${fmt(asmDue)} · <b style="color:${asmDue > dash.assembly.done ? 'var(--red)' : 'var(--ink)'}">${pct(asmDue ? dash.assembly.done / asmDue : null)}</b>${asmDue > dash.assembly.done ? ` · ${fmt(asmDue - dash.assembly.done)} behind` : ''}`;
   $('#aDel').innerHTML = `${fmt(delivered)} <small>/</small> ${fmt(contract)}`;
   $('#aDelSub').textContent = `${pct(contract ? delivered / contract : null)} of contract quantity`;
   const back = ds.reduce((a, r) => a + r.backlog, 0);
