@@ -314,7 +314,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <article class="card"><h3>Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
       <article class="card amber"><h3 id="cStageTitle">Period output</h3><div class="metric" id="cStage">—</div><div class="sub" id="cStageSub"></div></article>
       <article class="card amber"><h3>Assembly completed</h3><div class="metric" id="cAsm">—</div><div class="sub" id="cAsmSub"></div></article>
-      <article class="card red"><h3>Critical models</h3><div class="metric" id="cCrit">—</div><div class="sub" id="cCritSub"></div></article>
+      <article class="card"><h3 id="cRateTitle">Required per day</h3><div class="metric" id="cRate">—</div><div class="sub" id="cRateSub"></div></article>
     </div>
     <article class="panel" style="margin-bottom:22px">
       <div class="panel-head"><div><div class="eyebrow">Client delivery · whole contract</div><h2>Delivery status against the schedule</h2></div>
@@ -353,6 +353,12 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
         <div class="insight" id="insight"></div>
       </article>
     </div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow" id="orEyebrow">Daily rate</div><h2>Daily rate by model</h2></div>
+        <div class="chips" id="orBasis" style="margin:0"></div></div>
+      <div class="tbl-wrap"><table class="dm" id="orTbl"></table></div>
+      <p class="hint" id="orHint"></p>
+    </article>
     <article class="panel">
       <div class="panel-head"><div><div class="eyebrow">Product status</div><h2>Where each model stands</h2></div></div>
       <div class="tbl-wrap"><table id="statusTbl"></table></div>
@@ -1050,6 +1056,54 @@ function renderDaily() {
     `31 Oct is not in any delivery period; contract quantity with no delivery date (Spanish chair) is excluded.`;
 }
 
+/* ====================== overview: daily rate (follows the overview filters) ====================== */
+// Uses exactly what the dashboard shows: department, period (From–To), as-of date, product and risk filters.
+// target = plan in the period, due = plan due to the as-of date, done = output inside the period up to the as-of date.
+function renderOverviewRate() {
+  const D = S.dash; if (!D) return;
+  const B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, A = S.asOf, stg = STAGE[S.stage];
+  $('#orBasis').innerHTML = Object.entries(BASIS).map(([k, v]) =>
+    `<button type="button" class="chip" data-ob="${k}" aria-pressed="${S.dayBasis === k}">${v.label}</button>`).join('');
+  $$('#orBasis .chip').forEach(b => b.onclick = () => { S.dayBasis = b.dataset.ob; localStorage.setItem('kayan.dayBasis', S.dayBasis); renderOverviewRate(); });
+
+  const total = daysBetween(S.from, S.to, off);
+  const elapsed = A < S.from ? 0 : daysBetween(S.from, A < S.to ? A : S.to, off);
+  const left = daysBetween(A < S.from ? S.from : addDay(A, 1), S.to, off);
+  const ended = A >= S.to;
+  const rows = D.products.map(r => ({ r,
+    plan: total ? r.target / total : null,
+    actual: elapsed ? r.done / elapsed : null,
+    short: Math.max(0, r.due - r.done),
+    need: left ? Math.max(0, r.target - r.done) / left : null,
+    left: Math.max(0, r.target - r.done) }));
+  const sum = f => rows.reduce((a, x) => a + (f(x) || 0), 0);
+  const planT = sum(x => x.plan), actT = sum(x => x.actual), needT = sum(x => x.need), shortT = sum(x => x.short), leftT = sum(x => x.left);
+
+  $('#cRateTitle').textContent = `${stg} required per day`;
+  $('#cRate').innerHTML = !rows.length ? '—' : left ? `${r1(needT)} <small>/ day</small>` : '—';
+  $('#cRateSub').innerHTML = !rows.length ? 'No products in view' : left
+    ? `Plan ${r1(planT)}/day · actual ${r1(actT)}/day<br>${left} day${left === 1 ? '' : 's'} left to ${dshort(S.to)}`
+    : `Period ended ${dshort(S.to)} · ${fmt(Math.round(leftT))} short of target`;
+
+  $('#orEyebrow').textContent = `${periodShort()} · ${stg} · ${B.label.toLowerCase()}`;
+  const head = `<thead><tr><th>Model</th><th class="n">Period target</th><th class="n" title="Target ÷ days in the period">Plan / day</th><th class="n">Output</th>` +
+    `<th class="n" title="Output in the period ÷ days elapsed to the as-of date">Actual / day</th><th class="n" title="Plan due to the as-of date − output">Shortage</th>` +
+    `<th class="n sep0" title="(Target − output) ÷ days left after the as-of date">Required / day<br><small class="muted">${left} day${left === 1 ? '' : 's'} left</small></th></tr></thead>`;
+  const body = rows.map(x => { const r = x.r, behind = x.need != null && (x.actual == null || x.need > x.actual);
+    return `<tr><td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>` +
+      `<td class="n">${fmt(r.target)}</td><td class="n">${r.target ? r1(x.plan) : '<span class="muted">·</span>'}</td><td class="n">${fmt(r.done)}</td>` +
+      `<td class="n">${x.actual == null ? '<span class="muted">·</span>' : r1(x.actual)}</td>` +
+      `<td class="n" ${x.short > 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${x.short > 0.5 ? fmt(Math.round(x.short)) : '<span class="muted">0</span>'}</td>` +
+      `<td class="n" ${behind && r.target ? 'style="color:var(--red);font-weight:800"' : 'style="font-weight:800"'}>${x.need == null ? '<span class="muted">—</span>' : r1(x.need)}</td></tr>`; }).join('');
+  const tot = rows.length ? `<tr><td><b>Total</b></td><td class="n"><b>${fmt(sum(x => x.r.target))}</b></td><td class="n"><b>${r1(planT)}</b></td><td class="n"><b>${fmt(sum(x => x.r.done))}</b></td>` +
+    `<td class="n"><b>${elapsed ? r1(actT) : '·'}</b></td><td class="n"><b>${fmt(Math.round(shortT))}</b></td><td class="n"><b>${left ? r1(needT) : '—'}</b></td></tr>` : '';
+  $('#orTbl').innerHTML = head + '<tbody>' + (body || '<tr><td colspan="7" class="empty-state">No products match the current filters.</td></tr>') + tot + '</tbody>';
+  $('#orHint').textContent = `Period ${dshort(S.from)} – ${dshort(S.to)}: ${total} ${S.dayBasis === 'cal' ? 'calendar' : 'working'} days, ${elapsed} elapsed to ${dshort(A)}, ${left} left. ` +
+    `Plan / day = period target ÷ days; Actual / day = output in the period ÷ days elapsed (as-of day included); Required / day = (target − output) ÷ days left after the as-of date, so it already contains the shortage of the period. ` +
+    `Shortage counts only this period: select Whole plan to include everything since the start. It uses the server's calendar pro-rating even on a working-day basis. ` +
+    `A long period averages over its gaps (31 Oct is in no delivery period). No capacity limit is applied.`;
+}
+
 /* ====================== rendering: overview ====================== */
 async function loadOverview() {
   if (!S.from || !S.to || S.to < S.from) { banner('Choose a valid period (To must be on or after From).'); return; }
@@ -1060,7 +1114,7 @@ async function loadOverview() {
     rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
   ]);
   S.dash = dash; S.dstat = ds; S.dm = dm;
-  renderOverview(); renderDeliveryStatus();
+  renderOverview(); renderDeliveryStatus(); renderOverviewRate();
 }
 function renderOverview() {
   const D = S.dash; if (!D) return;
@@ -1074,8 +1128,6 @@ function renderOverview() {
   $('#cStageSub').textContent = sm.target ? `${pct(sm.achievement)} achieved · ${fmt(sm.due)} due to date` : 'No plan quantity in this period';
   $('#cAsm').innerHTML = `${fmt(D.assembly.done)} <small>/</small> ${fmt(D.assembly.scope)}`;
   $('#cAsmSub').textContent = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
-  $('#cCrit').textContent = sm.critical;
-  $('#cCritSub').textContent = `${sm.in_view} model${sm.in_view === 1 ? '' : 's'} in current view`;
   $('#execEyebrow').textContent = `${periodShort()} execution`;
 
   const rows = D.products;
