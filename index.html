@@ -1057,66 +1057,64 @@ function renderDaily() {
 }
 
 /* ====================== overview: daily rate (follows the overview filters) ====================== */
-// Uses exactly what the dashboard shows: department, period (From–To), as-of date, product and risk filters.
-// target = plan in the period, due = plan REQUIRED BY the as-of date, done = output inside the period up to the as-of date.
+// Required rate per day = plan rate of the delivery period being worked on + the backlog spread over its remaining days.
+// Filters in use: department, period (From–To), as-of date, product, risk.
+// due = plan required by the as-of date, done = output inside the period up to the as-of date, backlog = max(0, due − done) per model.
 function renderOverviewRate() {
   const D = S.dash; if (!D) return;
-  const B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, A = S.asOf, stg = STAGE[S.stage];
+  const B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, A = S.asOf, stg = STAGE[S.stage], at = dshort(A);
   $('#orBasis').innerHTML = Object.entries(BASIS).map(([k, v]) =>
     `<button type="button" class="chip" data-ob="${k}" aria-pressed="${S.dayBasis === k}">${v.label}</button>`).join('');
   $$('#orBasis .chip').forEach(b => b.onclick = () => { S.dayBasis = b.dataset.ob; localStorage.setItem('kayan.dayBasis', S.dayBasis); renderOverviewRate(); });
 
-  const total = daysBetween(S.from, S.to, off);
   const elapsed = A < S.from ? 0 : daysBetween(S.from, A < S.to ? A : S.to, off);
-  const left = daysBetween(A < S.from ? S.from : addDay(A, 1), S.to, off);
-
-  // plan rate in force on the as-of date: the delivery period containing it (the next one if the date falls in a gap)
-  const pAt = (S.ref.periods || []).find(p => p.e >= A);
-  const pAtDays = pAt ? daysBetween(pAt.s, pAt.e, off) : 0;
+  // delivery period being worked on: the running one while it still has days after the as-of date, otherwise the next one
+  const tp = (S.ref.periods || []).map(p => ({ p, days: p.s <= A ? daysBetween(addDay(A, 1), p.e, off) : daysBetween(p.s, p.e, off), full: daysBetween(p.s, p.e, off) }))
+    .find(x => x.p.e >= A && x.days > 0 && x.p.s <= S.to);
   const planAt = new Map();
-  if (pAt && pAtDays) (S.dm || []).filter(x => x.period_start === pAt.s).forEach(x => planAt.set(x.product_id, x.planned / pAtDays));
+  if (tp && tp.full) (S.dm || []).filter(x => x.period_start === tp.p.s).forEach(x => planAt.set(x.product_id, x.planned / tp.full));
 
   const rows = D.products.map(r => {
-    const short = Math.max(0, r.due - r.done);
-    return { r, short,
-      planAt: planAt.get(r.id) ?? 0,
-      actual: elapsed ? r.done / elapsed : null,
-      need: left ? Math.max(0, r.target - r.done) / left : null,
-      left: Math.max(0, r.target - r.done) };
+    const backlog = Math.max(0, r.due - r.done), plan = planAt.get(r.id) ?? 0, bpd = tp ? backlog / tp.days : null;
+    return { r, backlog, plan, bpd, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
   });
   const sum = f => rows.reduce((a, x) => a + (f(x) || 0), 0);
-  const dueT = sum(x => x.r.due), doneT = sum(x => x.r.done), shortT = sum(x => x.short);
-  const planAtT = sum(x => x.planAt), actT = sum(x => x.actual), needT = sum(x => x.need), leftT = sum(x => x.left);
-  const at = dshort(A);
+  const dueT = sum(x => x.r.due), doneT = sum(x => x.r.done), backT = sum(x => x.backlog);
+  const planT = sum(x => x.plan), bpdT = tp ? backT / tp.days : 0, reqT = planT + bpdT, actT = sum(x => x.actual);
+  const range = tp ? `${dshort(tp.p.s)}–${dshort(tp.p.e)}` : '';
 
-  $('#cRateTitle').textContent = `${stg} required by ${at}`;
-  $('#cRate').innerHTML = !rows.length ? '—' : `${fmt(Math.round(dueT))} <small>by ${at}</small>`;
-  $('#cRateSub').innerHTML = !rows.length ? 'No products in view' :
-    `Output ${fmt(doneT)} · short ${fmt(Math.round(shortT))}<br>` +
-    (left ? `Needed ${r1(needT)}/day for the ${left} day${left === 1 ? '' : 's'} left to ${dshort(S.to)}<br>Plan ${r1(planAtT)}/day on ${at} · avg actual ${elapsed ? r1(actT) : '—'}/day`
-          : `Period ended ${dshort(S.to)} · ${fmt(Math.round(leftT))} short of target`);
+  $('#cRateTitle').textContent = `${stg} required per day`;
+  $('#cRate').innerHTML = !rows.length ? '—' : tp ? `${r1(reqT)} <small>/ day</small>` : '—';
+  $('#cRateSub').innerHTML = !rows.length ? 'No products in view' : tp
+    ? `Plan ${r1(planT)} + backlog ${r1(bpdT)} per day<br>Backlog ${fmt(Math.round(backT))} · ${tp.days} day${tp.days === 1 ? '' : 's'} · ${range}<br>Avg actual ${elapsed ? r1(actT) : '—'}/day`
+    : `No delivery period left after ${at} in this range<br>Backlog ${fmt(Math.round(backT))}`;
 
   $('#orEyebrow').textContent = `${periodShort()} · ${stg} · ${B.label.toLowerCase()}`;
-  const head = `<thead><tr><th>Model</th><th class="n">Period target</th>` +
+  const head = `<thead><tr><th>Model</th>` +
     `<th class="n" title="Plan quantity required from the start of the period up to the as-of date">Required by ${at}</th><th class="n">Output</th>` +
-    `<th class="n" title="Required by the as-of date − output (never below zero)">Shortage</th>` +
-    `<th class="n" title="${pAt ? `Delivery plan of ${dshort(pAt.s)}–${dshort(pAt.e)} ÷ ${pAtDays} days` : 'No delivery period left'}">Plan / day<br><small class="muted">${pAt ? `${dshort(pAt.s)}–${dshort(pAt.e)}` : 'none'}</small></th>` +
-    `<th class="n" title="Output in the period ÷ days elapsed to the as-of date">Avg actual / day</th>` +
-    `<th class="n sep0" title="(Target − output) ÷ days left after the as-of date">Required / day<br><small class="muted">${left} day${left === 1 ? '' : 's'} left</small></th></tr></thead>`;
-  const body = rows.map(x => { const r = x.r, behind = x.need != null && (x.actual == null || x.need > x.actual);
+    `<th class="n" title="Required by the as-of date − output, never below zero">Backlog</th>` +
+    `<th class="n" title="${tp ? `Delivery plan of ${range} ÷ ${tp.full} days` : 'No delivery period left'}">Plan / day<br><small class="muted">${range || 'none'}</small></th>` +
+    `<th class="n" title="Backlog ÷ days left in the period">Backlog / day<br><small class="muted">${tp ? `${tp.days} day${tp.days === 1 ? '' : 's'}` : ''}</small></th>` +
+    `<th class="n sep0" title="Plan / day + backlog / day">Required / day</th>` +
+    `<th class="n" title="Output in the selected period ÷ days elapsed to the as-of date">Avg actual / day</th></tr></thead>`;
+  const body = rows.map(x => { const r = x.r, behind = x.req != null && (x.actual == null || x.req > x.actual);
     return `<tr><td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>` +
-      `<td class="n">${fmt(r.target)}</td><td class="n">${fmt(r.due)}</td><td class="n">${fmt(r.done)}</td>` +
-      `<td class="n" ${x.short > 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${x.short > 0.5 ? fmt(Math.round(x.short)) : '<span class="muted">0</span>'}</td>` +
-      `<td class="n">${x.planAt ? r1(x.planAt) : '<span class="muted">·</span>'}</td>` +
-      `<td class="n">${x.actual == null ? '<span class="muted">·</span>' : r1(x.actual)}</td>` +
-      `<td class="n" ${behind && r.target ? 'style="color:var(--red);font-weight:800"' : 'style="font-weight:800"'}>${x.need == null ? '<span class="muted">—</span>' : r1(x.need)}</td></tr>`; }).join('');
-  const tot = rows.length ? `<tr><td><b>Total</b></td><td class="n"><b>${fmt(sum(x => x.r.target))}</b></td><td class="n"><b>${fmt(dueT)}</b></td><td class="n"><b>${fmt(doneT)}</b></td>` +
-    `<td class="n"><b>${fmt(Math.round(shortT))}</b></td><td class="n"><b>${planAtT ? r1(planAtT) : '·'}</b></td><td class="n"><b>${elapsed ? r1(actT) : '·'}</b></td><td class="n"><b>${left ? r1(needT) : '—'}</b></td></tr>` : '';
+      `<td class="n">${fmt(r.due)}</td><td class="n">${fmt(r.done)}</td>` +
+      `<td class="n" ${x.backlog > 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${x.backlog > 0.5 ? fmt(Math.round(x.backlog)) : '<span class="muted">0</span>'}</td>` +
+      `<td class="n">${x.plan ? r1(x.plan) : '<span class="muted">·</span>'}</td>` +
+      `<td class="n">${x.bpd ? r1(x.bpd) : '<span class="muted">·</span>'}</td>` +
+      `<td class="n" ${behind && x.req ? 'style="color:var(--red);font-weight:800"' : 'style="font-weight:800"'}>${x.req ? r1(x.req) : '<span class="muted">·</span>'}</td>` +
+      `<td class="n">${x.actual == null ? '<span class="muted">·</span>' : r1(x.actual)}</td></tr>`; }).join('');
+  const tot = rows.length ? `<tr><td><b>Total</b></td><td class="n"><b>${fmt(dueT)}</b></td><td class="n"><b>${fmt(doneT)}</b></td><td class="n"><b>${fmt(Math.round(backT))}</b></td>` +
+    `<td class="n"><b>${planT ? r1(planT) : '·'}</b></td><td class="n"><b>${bpdT ? r1(bpdT) : '·'}</b></td><td class="n"><b>${tp ? r1(reqT) : '—'}</b></td><td class="n"><b>${elapsed ? r1(actT) : '·'}</b></td></tr>` : '';
   $('#orTbl').innerHTML = head + '<tbody>' + (body || '<tr><td colspan="8" class="empty-state">No products match the current filters.</td></tr>') + tot + '</tbody>';
-  $('#orHint').textContent = `Everything follows the As-of date (${at}). Required by date = plan due from ${dshort(S.from)} to ${at}; Shortage = required by date − output. ` +
-    `Plan / day = delivery plan of the period running on ${at} ÷ its ${S.dayBasis === 'cal' ? 'calendar' : 'working'} days. Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${S.dayBasis === 'cal' ? 'calendar' : 'working'} days elapsed. ` +
-    `Required / day = (period target − output) ÷ ${left} days left after ${at}, so it already contains the shortage. ` +
-    `Shortage counts only the selected period: choose Whole plan for everything since the start. Shortage uses the server's calendar pro-rating even on a working-day basis. No capacity limit is applied.`;
+  const unit = S.dayBasis === 'cal' ? 'calendar' : 'working';
+  $('#orHint').textContent = tp
+    ? `As of ${at}, the period being worked on is ${range}${tp.p.s <= A ? ` (${tp.days} ${unit} days left after ${at})` : ` (starts after ${at}; ${tp.days} ${unit} days)`}. ` +
+      `Required / day = plan of that period ÷ ${tp.full} ${unit} days + backlog ÷ ${tp.days} days. Backlog = plan required by ${at} − output, per model (a surplus on one model does not offset another). ` +
+      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted inside the selected period only: choose Whole plan for everything since the start; it uses the server's calendar pro-rating even on a working-day basis. ` +
+      `No capacity limit is applied: a rate above what the department can produce means the backlog will not clear in that period.`
+    : `No delivery period with days left after ${at} inside the selected range, so no rate is calculated; the backlog is shown as is.`;
 }
 
 /* ====================== rendering: overview ====================== */
