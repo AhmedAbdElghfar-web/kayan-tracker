@@ -455,6 +455,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
     <article class="panel">
       <div class="panel-head"><div><div class="eyebrow" id="dayEyebrow">Daily rate by delivery period</div><h2 id="dayTitle">Units per day, by model</h2></div>
         <div class="chips" id="dayBasis" style="margin:0"></div></div>
+      <div class="chips" id="dayHz" style="margin:0 0 12px" aria-label="Clear the shortage by"></div>
       <div class="tbl-wrap"><table class="dm" id="dayTbl"></table></div>
       <p class="hint" id="dayHint"></p>
     </article>
@@ -786,7 +787,7 @@ async function withPin(purpose, fn) {
 /* ====================== state ====================== */
 const S = {
   tab: 'overview', stage: 'chassis', period: null, from: null, to: null, asOf: localISO(),
-  month: localISO().slice(0, 7), pcDept: 'chassis', dayDept: 'chassis', dayBasis: localStorage.getItem('kayan.dayBasis') || 'cal',
+  month: localISO().slice(0, 7), pcDept: 'chassis', dayDept: 'chassis', dayBasis: localStorage.getItem('kayan.dayBasis') || 'cal', dayHz: localStorage.getItem('kayan.dayHz') || 'end',
   product: '', risk: '', matStatus: '', matDept: '', matLead: 0, prodDept: '', recDept: localStorage.getItem('kayan.recDept') || '',
   ref: { products: [], stages: [], components: [], materials: [], periods: [] },
   dash: null, matrix: null, matStatus_: null, dm: null,
@@ -974,52 +975,79 @@ async function loadDaily() {
   S.dser = await rpc('kayan_period_series', { p_as_of: localISO(), p_lead_days: 0 });
   renderDaily();
 }
+const HZ = { cur: 'Current period', next: 'Next period', end: 'End of plan' };
 function renderDaily() {
   if (!S.dser) return;
   const today = localISO(), B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, st = S.dayDept, pids = productIds();
+  const hzKey = HZ[S.dayHz] ? S.dayHz : 'end';
   $('#dayDept').innerHTML = Object.entries(DEPT).map(([k, v]) =>
     `<button type="button" class="chip" data-dd="${k}" aria-pressed="${st === k}">${v}</button>`).join('');
   $$('#dayDept .chip').forEach(b => b.onclick = () => { S.dayDept = b.dataset.dd; renderDaily(); });
   $('#dayBasis').innerHTML = Object.entries(BASIS).map(([k, v]) =>
     `<button type="button" class="chip" data-db="${k}" aria-pressed="${S.dayBasis === k}">${v.label}</button>`).join('');
   $$('#dayBasis .chip').forEach(b => b.onclick = () => { S.dayBasis = b.dataset.db; localStorage.setItem('kayan.dayBasis', S.dayBasis); renderDaily(); });
-  $('#inView').textContent = `Daily rates from the client delivery plan · status as of today, ${dlong(today)}`;
+  $('#dayHz').innerHTML = `<span class="muted" style="align-self:center;margin-right:4px">Clear the shortage by end of:</span>` +
+    Object.entries(HZ).map(([k, v]) => `<button type="button" class="chip" data-dh="${k}" aria-pressed="${hzKey === k}">${v}</button>`).join('');
+  $$('#dayHz .chip').forEach(b => b.onclick = () => { S.dayHz = b.dataset.dh; localStorage.setItem('kayan.dayHz', S.dayHz); renderDaily(); });
+  $('#inView').textContent = `Required daily rate from today, ${dlong(today)}, including the shortage to date`;
 
   const all = S.dser.stages || [];
   const P = S.ref.periods.filter(p => all.some(x => x.s === p.s && x.plan > 0));
   const items = all.filter(x => x.st === st && (!pids || pids.includes(x.p)));
-  const by = new Map(); items.forEach(x => { if (!by.has(x.p)) by.set(x.p, {}); by.get(x.p)[x.s] = x; });
+  const by = new Map(); items.forEach(x => { if (!by.has(x.p)) by.set(x.p, []); by.get(x.p).push(x); });
   const prods = S.ref.products.filter(p => by.has(p.id));
   const nd = new Map(P.map(p => [p.s, daysBetween(p.s, p.e, off)]));
-  const rate = (x, p) => x && x.plan > 0 && nd.get(p.s) ? x.plan / nd.get(p.s) : null;
   const cur = P.find(p => p.s <= today && p.e >= today);
-  const elapsed = cur ? daysBetween(cur.s, today, off) : 0, remain = cur ? daysBetween(addDay(today, 1), cur.e, off) : 0;
-  const nowOf = pid => { const x = cur && by.get(pid)?.[cur.s]; if (!x || !(x.plan > 0)) return null;
-    const done = x.done || 0;
-    return { actual: elapsed ? done / elapsed : null, need: remain ? Math.max(0, x.plan - done) / remain : null }; };
-  const hl = 'background:#fff7e6';
-  $('#dayEyebrow').textContent = `${DEPT[st]} · ${B.label.toLowerCase()}`;
-  $('#dayTitle').textContent = `Units per day, by model`;
+  const elapsed = cur ? daysBetween(cur.s, today, off) : 0;
 
-  const tot = P.map(() => 0); let totPlan = 0, totAct = 0, totNeed = 0, anyNow = false;
+  // periods still open: the running one counts only the days after today
+  const first = P.findIndex(p => p.e >= today);
+  const R = first < 0 ? [] : P.slice(first).map(p => ({ p, nd: nd.get(p.s), days: p.s <= today ? daysBetween(addDay(today, 1), p.e, off) : nd.get(p.s) }));
+  let hz = Math.min(hzKey === 'cur' ? 1 : hzKey === 'next' ? 2 : R.length, R.length);
+  const hDaysOf = n => R.slice(0, n).reduce((a, r) => a + r.days, 0);
+  while (hz < R.length && hDaysOf(hz) === 0) hz++;     // no working day left in the chosen horizon → extend to the next period
+  const hDays = hDaysOf(hz);
+
   const rows = prods.map(p => {
-    const m = by.get(p.id); let planSum = 0;
-    const cells = P.map((per, i) => { const x = m[per.s], r = rate(x, per); if (r != null) { tot[i] += r; planSum += x.plan; }
-      return `<td class="n" style="${cur && per.s === cur.s ? hl : ''}" title="${x && x.plan ? `${fmt(x.plan)} units ÷ ${nd.get(per.s)} days` : ''}">${r == null ? '<span class="muted">·</span>' : r1(r)}</td>`; }).join('');
-    totPlan += planSum;
-    const nw = nowOf(p.id); if (nw) { anyNow = true; totAct += nw.actual || 0; totNeed += nw.need || 0; }
-    const behind = nw && nw.need != null && nw.actual != null && nw.need > nw.actual;
-    return `<tr><td class="pname"><b>${esc(p.name_en)}</b><span class="ar">${esc(p.name_ar)}</span></td>${cells}<td class="n">${fmt(planSum)}</td>` +
-      (cur ? `<td class="n sep">${nw ? r1(nw.actual) : '<span class="muted">·</span>'}</td><td class="n" ${behind ? 'style="color:var(--red);font-weight:800"' : ''}>${nw ? (nw.need == null ? '<span class="muted">—</span>' : r1(nw.need)) : '<span class="muted">·</span>'}</td>` : '') + '</tr>';
-  }).join('');
-  $('#dayTbl').innerHTML = `<thead><tr><th>Model</th>${P.map(p => `<th class="n" style="${cur && p.s === cur.s ? hl : ''}">${dshort(p.s)}–${dshort(p.e)}<br><small class="muted">${nd.get(p.s)} days</small></th>`).join('')}<th class="n">Plan total</th>` +
-    (cur ? `<th class="n sep" title="Output recorded in the current period ÷ days elapsed to today">Actual / day so far<br><small class="muted">${dshort(cur.s)}–${dshort(today)}</small></th><th class="n" title="Plan not yet produced ÷ days left after today">Needed / day<br><small class="muted">${remain} day${remain === 1 ? '' : 's'} left</small></th>` : '') + '</tr></thead><tbody>' +
-    (rows || `<tr><td colspan="${P.length + 4}" class="empty-state">No models with a plan in this department.</td></tr>`) +
-    (rows ? `<tr><td><b>Total</b></td>${tot.map((t, i) => `<td class="n" style="${cur && P[i].s === cur.s ? hl : ''}"><b>${t ? r1(t) : '·'}</b></td>`).join('')}<td class="n"><b>${fmt(totPlan)}</b></td>` +
-      (cur ? `<td class="n sep"><b>${anyNow ? r1(totAct) : '·'}</b></td><td class="n"><b>${anyNow && remain ? r1(totNeed) : '—'}</b></td>` : '') + '</tr>' : '') + '</tbody>';
-  $('#dayHint').innerHTML = `Rate = client delivery plan of the period ÷ ${S.dayBasis === 'cal' ? 'calendar days' : 'working days'} in it (hover a cell for the quantities). The plan in every department is the delivery plan itself, so this is also the output required per day in ${DEPT[st].toLowerCase()}.<br>` +
-    (cur ? `Current period (highlighted): <b>Actual / day so far</b> = output recorded in the period ÷ days elapsed including today; <b>Needed / day</b> = plan not yet produced ÷ days left after today, red when above the actual pace. ` : 'No delivery period is running today. ') +
-    `The 31 Oct is not in any delivery period (16–30 Oct, then 1–15 Nov). Contract quantity with no delivery date (Spanish chair) is not included.`;
+    const xs = by.get(p.id), mine = new Map(xs.map(x => [x.s, x]));
+    let due = 0;
+    P.forEach(per => { const x = mine.get(per.s); if (!x || !(x.plan > 0)) return;
+      if (per.e < today) due += x.plan; else if (per.s <= today && nd.get(per.s)) due += x.plan * elapsed / nd.get(per.s); });
+    const done = xs.reduce((a, x) => a + (x.done || 0), 0);
+    const short = Math.max(0, due - done), add = hDays ? short / hDays : 0;
+    const xc = cur && mine.get(cur.s), actual = xc && xc.plan > 0 && elapsed ? (xc.done || 0) / elapsed : null;
+    let rest = short;
+    const cells = R.map((r, i) => { const x = mine.get(r.p.s), base = x && x.plan > 0 && r.nd ? x.plan / r.nd : 0;
+      rest += base * r.days;
+      const rate = r.days ? base + (i < hz ? add : 0) : 0;
+      const sub = rate && i < hz && short > 0 ? `<br><small class="muted">plan ${r1(base)}</small>` : '';
+      return { rate, base, html: `<td class="n" style="${cur && r.p.s === cur.s ? 'background:#fff7e6' : ''}">${rate ? `<b>${r1(rate)}</b>${sub}` : '<span class="muted">·</span>'}</td>` }; });
+    return { p, due, done, short, actual, cells, rest };
+  }).filter(r => r.due || r.done || r.rest);
+
+  const sum = f => rows.reduce((a, r) => a + f(r), 0);
+  const hl = 'background:#fff7e6';
+  $('#dayEyebrow').textContent = `${DEPT[st]} · ${B.label.toLowerCase()} · shortage cleared by end of ${HZ[hzKey].toLowerCase()}`;
+  $('#dayTitle').textContent = `Required units per day, by model`;
+  const head = `<thead><tr><th>Model</th><th class="n" title="Plan due from the first period to today">Plan due to date</th><th class="n">Output to date</th><th class="n" title="Plan due to date − output to date, per model, never below zero">Shortage</th>` +
+    (cur ? `<th class="n" title="Output recorded in the running period ÷ days elapsed including today">Actual / day<br><small class="muted">${dshort(cur.s)}–${dshort(today)}</small></th>` : '') +
+    R.map((r, i) => `<th class="n sep0" style="${cur && r.p.s === cur.s ? hl : ''}">${dshort(r.p.s)}–${dshort(r.p.e)}<br><small class="muted">${r.days} day${r.days === 1 ? '' : 's'}${r.p.s <= today ? ' left' : ''}${i < hz ? ' · incl. shortage' : ''}</small></th>`).join('') +
+    `<th class="n" title="Shortage + plan for the days still open">Remaining need</th></tr></thead>`;
+  const body = rows.map(r => `<tr><td class="pname"><b>${esc(r.p.name_en)}</b><span class="ar">${esc(r.p.name_ar)}</span></td>` +
+    `<td class="n">${fmt(Math.round(r.due))}</td><td class="n">${fmt(r.done)}</td><td class="n" ${r.short > 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${r.short > 0.5 ? fmt(Math.round(r.short)) : '<span class="muted">0</span>'}</td>` +
+    (cur ? `<td class="n">${r.actual == null ? '<span class="muted">·</span>' : r1(r.actual)}</td>` : '') +
+    r.cells.map(c => c.html).join('') + `<td class="n">${fmt(Math.round(r.rest))}</td></tr>`).join('');
+  const totRow = rows.length ? `<tr><td><b>Total</b></td><td class="n"><b>${fmt(Math.round(sum(r => r.due)))}</b></td><td class="n"><b>${fmt(sum(r => r.done))}</b></td><td class="n"><b>${fmt(Math.round(sum(r => r.short)))}</b></td>` +
+    (cur ? `<td class="n"><b>${r1(sum(r => r.actual || 0))}</b></td>` : '') +
+    R.map((x, i) => `<td class="n" style="${cur && x.p.s === cur.s ? hl : ''}"><b>${r1(sum(r => r.cells[i].rate)) === '0' ? '·' : r1(sum(r => r.cells[i].rate))}</b></td>`).join('') +
+    `<td class="n"><b>${fmt(Math.round(sum(r => r.rest)))}</b></td></tr>` : '';
+  $('#dayTbl').innerHTML = head + '<tbody>' + (body || `<tr><td colspan="${R.length + 6}" class="empty-state">No models with a plan in this department.</td></tr>`) + totRow + '</tbody>';
+  $('#dayHint').innerHTML = (R.length ? '' : 'All delivery periods have ended. ') +
+    `Shortage = plan due to ${dshort(today)} − output recorded to date, per model (a surplus on one model does not offset another). ` +
+    `Required rate = plan of the period ÷ ${S.dayBasis === 'cal' ? 'calendar days' : 'working days'}, plus the shortage spread evenly over the ${hDays} day${hDays === 1 ? '' : 's'} left up to the end of ${R[hz - 1] ? dshort(R[hz - 1].p.e) : 'the horizon'}; the small “plan” figure is the rate without the shortage. ` +
+    `The running period counts only the days after today, so output recorded today is already in the shortage. ` +
+    `No capacity limit is applied: a rate above what the department can actually produce means the shortage will not close by that date. ` +
+    `31 Oct is not in any delivery period; contract quantity with no delivery date (Spanish chair) is excluded.`;
 }
 
 /* ====================== rendering: overview ====================== */
