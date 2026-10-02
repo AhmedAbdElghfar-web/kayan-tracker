@@ -1153,7 +1153,7 @@ function renderOverviewRate() {
 async function loadOverview() {
   if (!S.from || !S.to || S.to < S.from) { banner('Choose a valid period (To must be on or after From).'); return; }
   const today = localISO();
-  const [dash, ds, dm, dashT] = await Promise.all([
+  const [dash, ds, dm, dashT, dashA] = await Promise.all([
     rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: S.asOf,
       p_product_ids: productIds(), p_risk: S.risk || null }),
     rpc('kayan_delivery_status', { p_as_of: S.asOf }),
@@ -1161,8 +1161,11 @@ async function loadOverview() {
     // as-of date in the future = target date: the plan due by today is needed to split backlog (to date) from plan still to come
     S.asOf > today ? rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: today,
       p_product_ids: productIds(), p_risk: null }) : Promise.resolve(null),
+    // assembly plan due by the as-of date, for the assembly shortfall on the Assembly card
+    S.stage === 'assembly' ? Promise.resolve(null) : rpc('kayan_dashboard', { p_stage: 'assembly', p_from: S.from, p_to: S.to, p_as_of: S.asOf,
+      p_product_ids: productIds(), p_risk: null }),
   ]);
-  S.dash = dash; S.dstat = ds; S.dm = dm;
+  S.dash = dash; S.dstat = ds; S.dm = dm; S.asmDash = dashA || dash;
   S.dueToday = dashT ? new Map(dashT.products.map(r => [r.id, r.due])) : null;
   renderOverview(); renderDeliveryStatus(); renderOverviewRate();
 }
@@ -1177,7 +1180,12 @@ function renderOverview() {
   $('#cStage').innerHTML = `${fmt(sm.done)} <small>/</small> ${fmt(sm.target)}`;
   $('#cStageSub').textContent = sm.target ? `${pct(sm.achievement)} achieved · ${fmt(sm.due)} due to date` : 'No plan quantity in this period';
   $('#cAsm').innerHTML = `${fmt(D.assembly.done)} <small>/</small> ${fmt(D.assembly.scope)}`;
-  $('#cAsmSub').textContent = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
+  // assembly plan shortfall = plan due by the as-of date − assembled, per model, never below zero (a surplus on one model does not offset another)
+  const AD = S.asmDash, aRows = (AD && AD.products) || [];
+  const aDue = aRows.reduce((a, r) => a + (r.due || 0), 0), aShort = aRows.reduce((a, r) => a + Math.max(0, (r.due || 0) - (r.done || 0)), 0);
+  $('#cAsmSub').innerHTML = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete` +
+    (aRows.length ? `<br>Plan due by ${dshort(S.asOf)}: ${fmt(Math.round(aDue))}` +
+      `<br><b style="color:${aShort > 0.5 ? 'var(--red)' : 'inherit'}">Plan shortfall: ${fmt(Math.round(aShort))}</b>${aDue ? ` (${pct(aShort / aDue)} of due)` : ''}` : '');
   $('#execEyebrow').textContent = `${periodShort()} execution`;
 
   const rows = D.products;
