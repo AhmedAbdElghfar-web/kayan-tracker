@@ -308,7 +308,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
     <div class="cards">
       <article class="card"><h3>Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
       <article class="card amber"><h3 id="cStageTitle">Period output</h3><div class="metric" id="cStage">—</div><div class="sub" id="cStageSub"></div></article>
-      <article class="card amber"><h3>Assembly completed</h3><div class="metric" id="cAsm">—</div><div class="sub" id="cAsmSub"></div></article>
+      <article class="card amber"><h3 id="cAsmTitle">Assembly plan shortfall</h3><div class="metric" id="cAsm">—</div><div class="sub" id="cAsmSub"></div></article>
       <article class="card"><h3 id="cRateTitle">Required per day</h3><div class="metric" id="cRate">—</div><div class="sub" id="cRateSub"></div></article>
     </div>
     <article class="panel" style="margin-bottom:22px">
@@ -1179,13 +1179,19 @@ function renderOverview() {
   $('#cStageTitle').textContent = `${periodShort()} ${stg.toLowerCase()}`;
   $('#cStage').innerHTML = `${fmt(sm.done)} <small>/</small> ${fmt(sm.target)}`;
   $('#cStageSub').textContent = sm.target ? `${pct(sm.achievement)} achieved · ${fmt(sm.due)} due to date` : 'No plan quantity in this period';
-  $('#cAsm').innerHTML = `${fmt(D.assembly.done)} <small>/</small> ${fmt(D.assembly.scope)}`;
   // assembly plan shortfall = plan due by the as-of date − assembled, per model, never below zero (a surplus on one model does not offset another)
   const AD = S.asmDash, aRows = (AD && AD.products) || [];
   const aDue = aRows.reduce((a, r) => a + (r.due || 0), 0), aShort = aRows.reduce((a, r) => a + Math.max(0, (r.due || 0) - (r.done || 0)), 0);
-  $('#cAsmSub').innerHTML = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete` +
-    (aRows.length ? `<br>Plan due by ${dshort(S.asOf)}: ${fmt(Math.round(aDue))}` +
-      `<br><b style="color:${aShort > 0.5 ? 'var(--red)' : 'inherit'}">Plan shortfall: ${fmt(Math.round(aShort))}</b>${aDue ? ` (${pct(aShort / aDue)} of due)` : ''}` : '');
+  const asmDone = `Assembled ${fmt(D.assembly.done)} / ${fmt(D.assembly.scope)} · ${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
+  if (aRows.length) {
+    $('#cAsmTitle').textContent = 'Assembly plan shortfall';
+    $('#cAsm').innerHTML = `<span style="color:${aShort > 0.5 ? 'var(--red)' : 'inherit'}">${fmt(Math.round(aShort))}</span> <small>units</small>`;
+    $('#cAsmSub').innerHTML = `${aDue ? pct(aShort / aDue) : '—'} of plan due by ${dshort(S.asOf)} (${fmt(Math.round(aDue))})<br>${asmDone}`;
+  } else {
+    $('#cAsmTitle').textContent = 'Assembly completed';
+    $('#cAsm').innerHTML = `${fmt(D.assembly.done)} <small>/</small> ${fmt(D.assembly.scope)}`;
+    $('#cAsmSub').textContent = `${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
+  }
   $('#execEyebrow').textContent = `${periodShort()} execution`;
 
   const rows = D.products;
