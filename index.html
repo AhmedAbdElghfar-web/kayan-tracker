@@ -289,20 +289,15 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
 
   <section class="filters" id="filters" aria-label="Filters">
     <label class="field product"><span>Product</span><select id="fProduct"><option value="">All products</option></select></label>
-    <label class="field" data-for="overview"><span>Risk</span>
-      <select id="fRisk">
-        <option value="">All statuses</option><option value="critical">Critical</option>
-        <option value="at_risk">At risk</option><option value="on_track">On track</option>
-        <option value="na">No plan in period</option>
-      </select></label>
     <label class="field" data-for="overview"><span>Department</span>
       <select id="fStage"><option value="chassis">Chassis</option><option value="foam">Foam</option><option value="assembly">Assembly</option></select></label>
-    <label class="field" data-for="overview"><span>Period</span><select id="fPeriod"></select></label>
-    <div class="custom-range" id="customRange" data-for="overview">
+    <label class="field" style="display:none!important"><span>Period</span><select id="fPeriod"></select></label>
+    <div class="custom-range" id="customRange" style="display:none!important">
       <label class="field"><span>From</span><input type="date" id="fFrom"></label>
       <label class="field"><span>To</span><input type="date" id="fTo"></label>
     </div>
-    <label class="field" data-for="overview"><span>As of</span><input type="date" id="fAsOf"></label>
+    <label class="field" data-for="overview"><span>As of</span><select id="fAsOfSel"></select></label>
+    <label class="field" data-for="overview" id="asOfCustom" style="display:none"><span>Date</span><input type="date" id="fAsOf"></label>
     <label class="field" data-for="monthly"><span>Month</span><select id="fMonth"></select></label>
     <button class="linkbtn" id="resetBtn" type="button">Reset filters</button>
     <span class="inview" id="inView"></span>
@@ -847,14 +842,16 @@ function defaultPeriodKey(opts) {
   return next ? next.key : (opts.filter(o => o.key.startsWith('m:')).pop() || opts[0]).key;
 }
 function applyPeriod() {
-  const o = periodOptions().find(x => x.key === S.period);
-  if (o && o.key !== 'custom') { S.from = o.from; S.to = o.to; }
-  $('#customRange').classList.toggle('on', S.period === 'custom');
+  // One status date drives everything: plan and output are counted from the start of the plan to the end of the
+  // delivery period that contains the as-of date (the first period ending on or after it, else the last period).
+  const P = S.ref.periods, A = S.asOf;
+  S.period = 'all';
+  if (P.length) { S.from = P[0].s; S.to = (P.find(p => p.e >= A) || P[P.length - 1]).e; }
   $('#fFrom').value = S.from || ''; $('#fTo').value = S.to || '';
 }
 function periodShort() {
   const o = periodOptions().find(x => x.key === S.period);
-  return o && o.short ? o.short : `${dshort(S.from)}–${dshort(S.to)}`;
+  return `${dshort(S.from)}–${dshort(S.to)}`;
 }
 function buildSelects() {
   const P = S.ref.products;
@@ -865,7 +862,7 @@ function buildSelects() {
   const opts = periodOptions();
   if (!S.period || !opts.some(o => o.key === S.period)) S.period = defaultPeriodKey(opts);
   $('#fPeriod').innerHTML = opts.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
-  $('#fPeriod').value = S.period; applyPeriod();
+  $('#fPeriod').value = S.period; buildAsOf(); applyPeriod();
   const mo = monthOptions();
   if (!mo.some(o => o.key === S.month)) S.month = localISO().slice(0, 7);
   $('#fMonth').innerHTML = mo.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
@@ -874,11 +871,20 @@ function buildSelects() {
   syncProdForm();
 }
 function readFilters() {
-  S.product = $('#fProduct').value; S.risk = $('#fRisk').value; S.stage = $('#fStage').value;
-  S.period = $('#fPeriod').value; S.asOf = $('#fAsOf').value || localISO();
+  S.product = $('#fProduct').value; S.risk = ''; S.stage = $('#fStage').value;
+  S.asOfMode = $('#fAsOfSel').value || 'today';
+  S.asOf = S.asOfMode === 'today' ? localISO() : S.asOfMode === 'custom' ? ($('#fAsOf').value || S.asOf || localISO()) : S.asOfMode.slice(3);
+  $('#fAsOf').value = S.asOf; $('#asOfCustom').style.display = S.asOfMode === 'custom' ? '' : 'none';
   S.month = $('#fMonth').value || S.month;
-  if (S.period === 'custom') { S.from = $('#fFrom').value || S.from; S.to = $('#fTo').value || S.to; }
   applyPeriod();
+}
+function buildAsOf() {
+  const ends = [...new Set(S.ref.periods.map(p => p.e))].sort();
+  const mode = S.asOfMode || 'today';
+  $('#fAsOfSel').innerHTML = '<option value="today">Today</option>' +
+    ends.map(e => `<option value="pe:${e}">End of period · ${dshort(e)}</option>`).join('') +
+    '<option value="custom">Custom date…</option>';
+  $('#fAsOfSel').value = [...$('#fAsOfSel').options].some(o => o.value === mode) ? mode : 'today';
 }
 function productIds() { return S.product ? [Number(S.product)] : null; }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
@@ -1124,7 +1130,7 @@ function renderOverviewRate() {
   $('#orHint').textContent = tp
     ? `As of ${at}, the period being worked on is ${range}${tp.p.s <= A ? ` (${tp.days} ${unit} days left after ${at})` : ` (starts after ${at}; ${tp.days} ${unit} days)`}. ` +
       `Required / day = plan of that period ÷ ${tp.full} ${unit} days + backlog ÷ ${tp.days} days. Backlog = plan required by ${at} − output, per model (a surplus on one model does not offset another). ` +
-      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted inside the selected period only: choose Whole plan for everything since the start. To produce = plan due by the period end − output (same on any basis); Required / day = To produce ÷ days left. ` +
+      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted from the start of the plan. To produce = plan due by the period end − output (same on any basis); Required / day = To produce ÷ days left. ` +
       `No capacity limit is applied: a rate above what the department can produce means the backlog will not clear in that period.`
     : `No open delivery period with days left after ${at}: the plan has ended, so no rate is calculated; the backlog is shown as is.`;
 }
@@ -1703,7 +1709,7 @@ async function exportXlsx() {
       Risk: RISK[r.risk], Drivers: [r.reasons.includes('not_approved') && 'Not approved', r.reasons.includes('pace') && 'Below 50% of due',
         r.material_zero && ('Zero stock: ' + r.material_zero.join(', '))].filter(Boolean).join('; ') })),
       [['KAYAN Manufacturing & Delivery Control'], [`Stage: ${STAGE[S.stage]}`, `Period: ${S.from} to ${S.to}`, `As of: ${S.asOf}`],
-       [`Product filter: ${S.product ? pname(+S.product) : 'All'}`, `Risk filter: ${S.risk ? RISK[S.risk] : 'All'}`],
+       [`Product filter: ${S.product ? pname(+S.product) : 'All'}`, `Risk filter: All`],
        [`Completed ${D.summary.done} / target ${D.summary.target}`, `Critical ${D.summary.critical}`, `Weighted readiness ${D.summary.weighted_readiness == null ? 'N/A' : (D.summary.weighted_readiness * 100).toFixed(1) + '%'}`]]);
     add('Stage progress', matrix.flatMap(m => [{ Product: pname(m.product_id), Stage: STAGE[m.stage], Part: '(complete units)', Planned: m.planned, Done: m.done, Scrap: m.scrap },
       ...(m.components.length > 1 ? m.components.map(c => ({ Product: pname(m.product_id), Stage: STAGE[m.stage], Part: c.name_ar, Planned: c.planned, Done: c.done, Scrap: null })) : [])]));
@@ -1936,6 +1942,7 @@ function showTab(tab) {
   $$('nav.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
   $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== tab);
   $$('#filters [data-for=overview]').forEach(el => el.style.display = tab === 'overview' ? '' : 'none');
+  $('#asOfCustom').style.display = tab === 'overview' && S.asOfMode === 'custom' ? '' : 'none';  // custom date box only in Custom mode
   $$('#filters [data-for=monthly]').forEach(el => el.style.display = MONTHLY.includes(tab) ? '' : 'none');
   $('#filters').hidden = tab === 'record';
   if (tab === 'overview') $('#customRange').classList.toggle('on', S.period === 'custom');
@@ -1963,12 +1970,12 @@ async function refresh() {
   return refreshing;
 }
 function initFilters() {
-  $('#fAsOf').value = S.asOf;
-  ['#fProduct', '#fRisk', '#fStage', '#fPeriod', '#fFrom', '#fTo', '#fAsOf', '#fMonth'].forEach(id =>
+  $('#fAsOf').value = S.asOf; S.asOfMode = 'today';
+  ['#fProduct', '#fStage', '#fAsOfSel', '#fAsOf', '#fMonth'].forEach(id =>
     $(id).addEventListener('change', () => { readFilters(); refresh(); }));
   $('#resetBtn').addEventListener('click', () => {
-    $('#fProduct').value = ''; $('#fRisk').value = ''; $('#fStage').value = 'chassis';
-    S.asOf = localISO(); $('#fAsOf').value = S.asOf; S.period = defaultPeriodKey(periodOptions()); $('#fPeriod').value = S.period;
+    $('#fProduct').value = ''; $('#fStage').value = 'chassis';
+    $('#fAsOfSel').value = 'today';
     S.month = localISO().slice(0, 7); $('#fMonth').value = S.month;
     readFilters(); refresh();
   });
