@@ -1074,20 +1074,24 @@ function renderOverviewRate() {
   const planAt = new Map();
   if (tp && tp.full) (S.dm || []).filter(x => x.period_start === tp.p.s).forEach(x => planAt.set(x.product_id, x.planned / tp.full));
 
+  // Quantity still to produce from the day after the as-of date to the period end = (plan due by the period end) − output
+  //   = server backlog (calendar pro-rated, plan due by the as-of date − output) + the part of the period plan not yet due.
+  // It does not depend on the day basis. The day basis only decides how many days it is spread over, so
+  //   required / day = plan / day + backlog / day = to-produce ÷ days left; on a working-day basis the backlog is restated
+  //   as to-produce − plan / day × days left, so that the three figures always reconcile.
+  const cOff = BASIS.cal.off, calFull = tp ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
+        calLeft = tp ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0;
   const rows = D.products.map(r => {
-    const backlog = Math.max(0, r.due - r.done), plan = planAt.get(r.id) ?? 0, bpd = tp ? backlog / tp.days : null;
-    return { r, backlog, plan, bpd, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
+    const rawBack = Math.max(0, r.due - r.done), plan = planAt.get(r.id) ?? 0;
+    const need = tp && calFull ? rawBack + plan * tp.full * calLeft / calFull : 0;
+    const backlog = tp ? Math.max(0, need - plan * tp.days) : rawBack, bpd = tp ? backlog / tp.days : null;
+    return { r, backlog, plan, bpd, need, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
   });
   const sum = f => rows.reduce((a, x) => a + (f(x) || 0), 0);
   const dueT = sum(x => x.r.due), doneT = sum(x => x.r.done), backT = sum(x => x.backlog);
   const planT = sum(x => x.plan), bpdT = tp ? backT / tp.days : 0, reqT = planT + bpdT, actT = sum(x => x.actual);
   const range = tp ? `${dshort(tp.p.s)}–${dshort(tp.p.e)}` : '';
-  // units to produce from the day after the as-of date to the period end = backlog + the part of the period plan still open.
-  // Counted on calendar days (the backlog is pro-rated on calendar days by the server), so it does not change with the day-basis chips.
-  const cOff = BASIS.cal.off, calFull = tp ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
-        calLeft = tp ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0,
-        needOf = x => tp && calFull ? x.backlog + x.plan * tp.full * calLeft / calFull : 0;
-  const needT = rows.reduce((a, x) => a + needOf(x), 0);
+  const needT = sum(x => x.need);
 
   $('#cRateTitle').textContent = `${stg} required per day`;
   $('#cRate').innerHTML = !rows.length ? '—' : tp ? `${r1(reqT)} <small>/ day</small>` : '—';
@@ -1111,7 +1115,7 @@ function renderOverviewRate() {
       `<td class="n">${x.plan ? r1(x.plan) : '<span class="muted">·</span>'}</td>` +
       `<td class="n">${x.bpd ? r1(x.bpd) : '<span class="muted">·</span>'}</td>` +
       `<td class="n" ${behind && x.req ? 'style="color:var(--red);font-weight:800"' : 'style="font-weight:800"'}>${x.req ? r1(x.req) : '<span class="muted">·</span>'}</td>` +
-      `<td class="n">${tp ? fmt(Math.round(needOf(x))) : '<span class="muted">·</span>'}</td>` +
+      `<td class="n">${tp ? fmt(Math.round(x.need)) : '<span class="muted">·</span>'}</td>` +
       `<td class="n">${x.actual == null ? '<span class="muted">·</span>' : r1(x.actual)}</td></tr>`; }).join('');
   const tot = rows.length ? `<tr><td><b>Total</b></td><td class="n"><b>${fmt(dueT)}</b></td><td class="n"><b>${fmt(doneT)}</b></td><td class="n"><b>${fmt(Math.round(backT))}</b></td>` +
     `<td class="n"><b>${planT ? r1(planT) : '·'}</b></td><td class="n"><b>${bpdT ? r1(bpdT) : '·'}</b></td><td class="n"><b>${tp ? r1(reqT) : '—'}</b></td><td class="n"><b>${tp ? fmt(Math.round(needT)) : '·'}</b></td><td class="n"><b>${elapsed ? r1(actT) : '·'}</b></td></tr>` : '';
@@ -1120,7 +1124,7 @@ function renderOverviewRate() {
   $('#orHint').textContent = tp
     ? `As of ${at}, the period being worked on is ${range}${tp.p.s <= A ? ` (${tp.days} ${unit} days left after ${at})` : ` (starts after ${at}; ${tp.days} ${unit} days)`}. ` +
       `Required / day = plan of that period ÷ ${tp.full} ${unit} days + backlog ÷ ${tp.days} days. Backlog = plan required by ${at} − output, per model (a surplus on one model does not offset another). ` +
-      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted inside the selected period only: choose Whole plan for everything since the start; it uses the server's calendar pro-rating even on a working-day basis. ` +
+      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted inside the selected period only: choose Whole plan for everything since the start. To produce = plan due by the period end − output (same on any basis); Required / day = To produce ÷ days left. ` +
       `No capacity limit is applied: a rate above what the department can produce means the backlog will not clear in that period.`
     : `No open delivery period with days left after ${at}: the plan has ended, so no rate is calculated; the backlog is shown as is.`;
 }
