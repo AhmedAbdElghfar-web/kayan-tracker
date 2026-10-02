@@ -1073,21 +1073,30 @@ function renderOverviewRate() {
     `<button type="button" class="chip" data-ob="${k}" aria-pressed="${S.dayBasis === k}">${v.label}</button>`).join('');
   $$('#orBasis .chip').forEach(b => b.onclick = () => { S.dayBasis = b.dataset.ob; localStorage.setItem('kayan.dayBasis', S.dayBasis); renderOverviewRate(); });
 
-  const elapsed = A < S.from ? 0 : daysBetween(S.from, A < S.to ? A : S.to, off);
-  // delivery period being worked on: the running one while it still has days after the as-of date, otherwise the next one
-  const tp = (S.ref.periods || []).map(p => ({ p, days: p.s <= A ? daysBetween(addDay(A, 1), p.e, off) : daysBetween(p.s, p.e, off), full: daysBetween(p.s, p.e, off) }))
+  // As-of date in the future = target date: produce (plan due by that date − output to date) over the days from tomorrow to that date.
+  // Today or a past date: look forward to the end of the delivery period being worked on (the running one while it has days left, else the next).
+  const today = localISO(), fut = A > today && !!S.dueToday, E = fut ? today : A;
+  const elapsed = E < S.from ? 0 : daysBetween(S.from, E < S.to ? E : S.to, off);
+  let tp;
+  if (fut) { const d = daysBetween(addDay(E, 1), A, off); tp = d > 0 ? { p: { s: addDay(E, 1), e: A }, days: d, full: d } : null; }
+  else tp = (S.ref.periods || []).map(p => ({ p, days: p.s <= A ? daysBetween(addDay(A, 1), p.e, off) : daysBetween(p.s, p.e, off), full: daysBetween(p.s, p.e, off) }))
     .find(x => x.p.e >= A && x.days > 0);  // not capped by the To filter: the rate looks forward from the as-of date
   const planAt = new Map();
-  if (tp && tp.full) (S.dm || []).filter(x => x.period_start === tp.p.s).forEach(x => planAt.set(x.product_id, x.planned / tp.full));
+  if (tp && tp.full && !fut) (S.dm || []).filter(x => x.period_start === tp.p.s).forEach(x => planAt.set(x.product_id, x.planned / tp.full));
 
   // Quantity still to produce from the day after the as-of date to the period end = (plan due by the period end) − output
   //   = server backlog (calendar pro-rated, plan due by the as-of date − output) + the part of the period plan not yet due.
   // It does not depend on the day basis. The day basis only decides how many days it is spread over, so
   //   required / day = plan / day + backlog / day = to-produce ÷ days left; on a working-day basis the backlog is restated
   //   as to-produce − plan / day × days left, so that the three figures always reconcile.
-  const cOff = BASIS.cal.off, calFull = tp ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
-        calLeft = tp ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0;
+  const cOff = BASIS.cal.off, calFull = tp && !fut ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
+        calLeft = tp && !fut ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0;
   const rows = D.products.map(r => {
+    if (fut) {   // backlog = plan due by today − output; still to come = plan due by the target date − plan due by today
+      const dt = S.dueToday.get(r.id) ?? r.due, back = Math.max(0, dt - r.done), rem = Math.max(0, r.due - dt);
+      const plan = tp ? rem / tp.days : 0, bpd = tp ? back / tp.days : null;
+      return { r, backlog: back, plan, bpd, need: tp ? back + rem : 0, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
+    }
     const rawBack = Math.max(0, r.due - r.done), plan = planAt.get(r.id) ?? 0;
     const need = tp && calFull ? rawBack + plan * tp.full * calLeft / calFull : 0;
     const backlog = tp ? Math.max(0, need - plan * tp.days) : rawBack, bpd = tp ? backlog / tp.days : null;
@@ -1103,12 +1112,13 @@ function renderOverviewRate() {
   $('#cRate').innerHTML = !rows.length ? '—' : tp ? `${r1(reqT)} <small>/ day</small>` : '—';
   $('#cRateSub').innerHTML = !rows.length ? 'No products in view' : tp
     ? `To produce by ${dshort(tp.p.e)}: <b>${fmt(Math.round(needT))}</b> · ${tp.days} ${S.dayBasis === 'cal' ? '' : 'working '}day${tp.days === 1 ? '' : 's'} left<br>Plan ${r1(planT)} + backlog ${r1(bpdT)} per day<br>Backlog ${fmt(Math.round(backT))} · ${range}<br>Avg actual ${elapsed ? r1(actT) : '—'}/day`
+    : fut ? `No ${S.dayBasis === 'cal' ? '' : 'working '}day between today and ${at}<br>Backlog ${fmt(Math.round(backT))}`
     : `No open delivery period after ${at}<br>Backlog ${fmt(Math.round(backT))}`;
 
   $('#orEyebrow').textContent = `${periodShort()} · ${stg} · ${B.label.toLowerCase()}`;
   const head = `<thead><tr><th>Model</th>` +
     `<th class="n" title="Plan quantity required from the start of the period up to the as-of date">Required by ${at}</th><th class="n">Output</th>` +
-    `<th class="n" title="Required by the as-of date − output, never below zero">Backlog</th>` +
+    `<th class="n" title="${fut ? 'Plan due by today − output' : 'Required by the as-of date − output'}, never below zero">Backlog${fut ? '<br><small class="muted">to today</small>' : ''}</th>` +
     `<th class="n" title="${tp ? `Delivery plan of ${range} ÷ ${tp.full} days` : 'No delivery period left'}">Plan / day<br><small class="muted">${range || 'none'}</small></th>` +
     `<th class="n" title="Backlog ÷ days left in the period">Backlog / day<br><small class="muted">${tp ? `${tp.days} day${tp.days === 1 ? '' : 's'}` : ''}</small></th>` +
     `<th class="n sep0" title="Plan / day + backlog / day">Required / day</th>` +
@@ -1127,7 +1137,11 @@ function renderOverviewRate() {
     `<td class="n"><b>${planT ? r1(planT) : '·'}</b></td><td class="n"><b>${bpdT ? r1(bpdT) : '·'}</b></td><td class="n"><b>${tp ? r1(reqT) : '—'}</b></td><td class="n"><b>${tp ? fmt(Math.round(needT)) : '·'}</b></td><td class="n"><b>${elapsed ? r1(actT) : '·'}</b></td></tr>` : '';
   $('#orTbl').innerHTML = head + '<tbody>' + (body || '<tr><td colspan="9" class="empty-state">No products match the current filters.</td></tr>') + tot + '</tbody>';
   const unit = S.dayBasis === 'cal' ? 'calendar' : 'working';
-  $('#orHint').textContent = tp
+  $('#orHint').textContent = fut && tp
+    ? `Target date ${at}: ${tp.days} ${unit} days from tomorrow (${dshort(tp.p.s)}) to ${at}. To produce = plan due by ${at} − output to date. ` +
+      `Required / day = To produce ÷ ${tp.days} days = plan still to come ÷ days + backlog to today ÷ days. Backlog = plan due by today − output, per model (a surplus on one model does not offset another). ` +
+      `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days up to today. No capacity limit is applied.`
+    : tp
     ? `As of ${at}, the period being worked on is ${range}${tp.p.s <= A ? ` (${tp.days} ${unit} days left after ${at})` : ` (starts after ${at}; ${tp.days} ${unit} days)`}. ` +
       `Required / day = plan of that period ÷ ${tp.full} ${unit} days + backlog ÷ ${tp.days} days. Backlog = plan required by ${at} − output, per model (a surplus on one model does not offset another). ` +
       `Avg actual / day = output since ${dshort(S.from)} ÷ ${elapsed} ${unit} days. Backlog is counted from the start of the plan. To produce = plan due by the period end − output (same on any basis); Required / day = To produce ÷ days left. ` +
@@ -1138,13 +1152,18 @@ function renderOverviewRate() {
 /* ====================== rendering: overview ====================== */
 async function loadOverview() {
   if (!S.from || !S.to || S.to < S.from) { banner('Choose a valid period (To must be on or after From).'); return; }
-  const [dash, ds, dm] = await Promise.all([
+  const today = localISO();
+  const [dash, ds, dm, dashT] = await Promise.all([
     rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: S.asOf,
       p_product_ids: productIds(), p_risk: S.risk || null }),
     rpc('kayan_delivery_status', { p_as_of: S.asOf }),
     rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
+    // as-of date in the future = target date: the plan due by today is needed to split backlog (to date) from plan still to come
+    S.asOf > today ? rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: today,
+      p_product_ids: productIds(), p_risk: null }) : Promise.resolve(null),
   ]);
   S.dash = dash; S.dstat = ds; S.dm = dm;
+  S.dueToday = dashT ? new Map(dashT.products.map(r => [r.id, r.due])) : null;
   renderOverview(); renderDeliveryStatus(); renderOverviewRate();
 }
 function renderOverview() {
