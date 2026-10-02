@@ -24,10 +24,18 @@
   --radius:14px; --shadow:0 1px 2px rgba(16,38,59,.06),0 4px 14px rgba(16,38,59,.05);
   --font:'Nunito',system-ui,-apple-system,'Segoe UI',sans-serif; --ar:'Cairo','Segoe UI',Tahoma,sans-serif;
 }
+/* department theme: the Overview takes the colour of the selected department (data-dept on <html>) */
+@property --dept{syntax:'<color>';inherits:true;initial-value:#2a9fc9}
+@property --dept-bg{syntax:'<color>';inherits:true;initial-value:#eef2f5}
+@property --dept-tint{syntax:'<color>';inherits:true;initial-value:rgba(42,159,201,0)}
+:root{--dept:#2a9fc9;--dept-bg:#eef2f5;--dept-tint:rgba(42,159,201,0);transition:--dept .55s ease,--dept-bg .55s ease,--dept-tint .55s ease}
+:root[data-dept=chassis]{--dept:#2f6fb5;--dept-bg:#e6eef8;--dept-tint:rgba(47,111,181,.20)}
+:root[data-dept=foam]{--dept:#e07a1f;--dept-bg:#fbeedf;--dept-tint:rgba(224,122,31,.22)}
+:root[data-dept=assembly]{--dept:#6d5bd0;--dept-bg:#ece9fa;--dept-tint:rgba(109,91,208,.20)}
 *{box-sizing:border-box}
 html,body{margin:0}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{font-family:var(--font);color:var(--ink);background:var(--bg);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);color:var(--ink);background:linear-gradient(180deg,var(--dept-tint) 0,transparent 460px) no-repeat,var(--dept-bg);min-height:100vh;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
 .ar{font-family:var(--ar);direction:rtl;unicode-bidi:isolate}
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:3px solid rgba(42,159,201,.45);outline-offset:2px}
@@ -54,7 +62,7 @@ header .eyebrow{color:#3bb7dd}
 nav.tabs{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
 nav.tabs .wrap{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 nav.tabs button{background:none;border:0;padding:22px 16px 20px;font-size:20px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:4px solid transparent;white-space:nowrap}
-nav.tabs button[aria-selected=true]{color:var(--ink);font-weight:800;border-bottom-color:var(--teal)}
+nav.tabs button[aria-selected=true]{color:var(--ink);font-weight:800;border-bottom-color:var(--dept)}
 nav.tabs .spacer{flex:1}
 nav.tabs .rec{color:var(--teal-d)}
 
@@ -67,6 +75,16 @@ select,input[type=date],input[type=number],input[type=text],input[type=password]
   background:#fff;border:1px solid #cdd7e0;border-radius:10px;padding:12px 14px;font-size:17px;min-height:52px}
 .filters select{min-width:200px}
 .filters .product select{min-width:320px}
+#fStage{border-color:var(--dept);border-width:2px;font-weight:800;background:color-mix(in srgb,var(--dept) 9%,#fff);box-shadow:0 0 0 4px color-mix(in srgb,var(--dept) 16%,transparent);transition:box-shadow .4s,background .4s,border-color .4s}
+.field:has(#fStage)>span{color:var(--dept)}
+.linkbtn{color:var(--dept)}
+/* swap effect: cards rise in when the department changes */
+@keyframes deptIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+main.dept-swap [data-view=overview] .card,main.dept-swap [data-view=overview] .panel{animation:deptIn .5s cubic-bezier(.2,.7,.2,1) both}
+main.dept-swap [data-view=overview] .card:nth-child(2){animation-delay:.05s}
+main.dept-swap [data-view=overview] .card:nth-child(3){animation-delay:.1s}
+main.dept-swap [data-view=overview] .card:nth-child(4){animation-delay:.15s}
+@media (prefers-reduced-motion:reduce){:root{transition:none}main.dept-swap [data-view=overview] .card,main.dept-swap [data-view=overview] .panel{animation:none}}
 .linkbtn{background:none;border:0;color:var(--teal);font-weight:800;font-size:18px;cursor:pointer;padding:12px 8px}
 .inview{margin-left:auto;color:var(--muted);font-size:16px;padding-bottom:14px}
 .custom-range{display:none;gap:10px}
@@ -74,7 +92,7 @@ select,input[type=date],input[type=number],input[type=text],input[type=password]
 
 /* cards */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:22px}
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e3e9ee;border-top:5px solid var(--teal);padding:26px 26px 22px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e3e9ee;border-top:5px solid var(--dept);padding:26px 26px 22px}
 .card.amber{border-top-color:var(--amber)} .card.red{border-top-color:var(--red)}
 .card h3{margin:0 0 14px;font-size:17px;font-weight:800;letter-spacing:.02em;color:#3c4a57}
 .metric{white-space:nowrap;font-size:clamp(28px,2.35vw,44px);font-weight:900;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums}
@@ -871,12 +889,14 @@ function buildSelects() {
   syncProdForm();
 }
 function readFilters() {
+  const prevStage = S.stage;
   S.product = $('#fProduct').value; S.risk = ''; S.stage = $('#fStage').value;
   S.asOfMode = $('#fAsOfSel').value || 'today';
   S.asOf = S.asOfMode === 'today' ? localISO() : S.asOfMode === 'custom' ? ($('#fAsOf').value || S.asOf || localISO()) : S.asOfMode.slice(3);
   $('#fAsOf').value = S.asOf; $('#asOfCustom').style.display = S.asOfMode === 'custom' ? '' : 'none';
   S.month = $('#fMonth').value || S.month;
   applyPeriod();
+  applyDeptTheme(prevStage && prevStage !== S.stage);
 }
 function buildAsOf() {
   const ends = [...new Set(S.ref.periods.map(p => p.e))].sort();
@@ -885,6 +905,10 @@ function buildAsOf() {
     ends.map(e => `<option value="pe:${e}">End of period · ${dshort(e)}</option>`).join('') +
     '<option value="custom">Custom date…</option>';
   $('#fAsOfSel').value = [...$('#fAsOfSel').options].some(o => o.value === mode) ? mode : 'today';
+}
+function applyDeptTheme(swap) {
+  document.documentElement.dataset.dept = S.tab === 'overview' || !S.tab ? S.stage : '';
+  if (swap) { const m = $('main'); m.classList.remove('dept-swap'); void m.offsetWidth; m.classList.add('dept-swap'); setTimeout(() => m.classList.remove('dept-swap'), 900); }
 }
 function productIds() { return S.product ? [Number(S.product)] : null; }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
@@ -1971,7 +1995,7 @@ async function buildDeck() {
 
 /* ====================== navigation & refresh ====================== */
 function showTab(tab) {
-  S.tab = tab;
+  S.tab = tab; applyDeptTheme(false);
   $$('nav.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
   $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== tab);
   $$('#filters [data-for=overview]').forEach(el => el.style.display = tab === 'overview' ? '' : 'none');
@@ -2003,7 +2027,7 @@ async function refresh() {
   return refreshing;
 }
 function initFilters() {
-  $('#fAsOf').value = S.asOf; S.asOfMode = 'today';
+  $('#fAsOf').value = S.asOf; S.asOfMode = 'today'; applyDeptTheme(false);
   ['#fProduct', '#fStage', '#fAsOfSel', '#fAsOf', '#fMonth'].forEach(id =>
     $(id).addEventListener('change', () => { readFilters(); refresh(); }));
   $('#resetBtn').addEventListener('click', () => {
