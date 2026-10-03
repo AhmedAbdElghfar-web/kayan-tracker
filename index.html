@@ -93,6 +93,7 @@ main.dept-swap [data-view=overview] .card:nth-child(4){animation-delay:.15s}
 /* cards */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-bottom:22px}
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid #e3e9ee;border-top:5px solid var(--dept);padding:26px 26px 22px}
+.card.off{background:#f3f5f7;border-top-color:#c9d2da;box-shadow:none;opacity:.6}.card.off .metric,.card.off h3{color:#8a98a6}
 .card.amber{border-top-color:var(--amber)} .card.red{border-top-color:var(--red)}
 .card h3{margin:0 0 14px;font-size:17px;font-weight:800;letter-spacing:.02em;color:#3c4a57}
 .metric{white-space:nowrap;font-size:clamp(28px,2.35vw,44px);font-weight:900;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums}
@@ -1207,7 +1208,13 @@ function renderOverview() {
   const AD = S.asmDash, aRows = (AD && AD.products) || [];
   const aDue = aRows.reduce((a, r) => a + (r.due || 0), 0), aShort = aRows.reduce((a, r) => a + Math.max(0, (r.due || 0) - (r.done || 0)), 0);
   const asmDone = `Assembled ${fmt(D.assembly.done)} / ${fmt(D.assembly.scope)} · ${pct(D.assembly.scope ? D.assembly.done / D.assembly.scope : null)} complete`;
-  if (aRows.length) {
+  const asmOff = !(D.assembly.scope > 0) || !aRows.length;   // selected product(s) do not go through assembly -> card switched off
+  $('#cAsm').closest('.card').classList.toggle('off', asmOff);
+  if (asmOff) {
+    $('#cAsmTitle').textContent = 'Assembly plan backlog';
+    $('#cAsm').textContent = '—';
+    $('#cAsmSub').textContent = 'Not an assembly product: no assembly stage in the plan';
+  } else if (aRows.length) {
     $('#cAsmTitle').textContent = 'Assembly plan backlog';
     $('#cAsm').innerHTML = `<span style="color:${aShort > 0.5 ? 'var(--red)' : 'inherit'}">${fmt(Math.round(aShort))}</span> <small>units</small>`;
     $('#cAsmSub').innerHTML = `${aDue ? pct(aShort / aDue) : '—'} of plan due by ${dshort(S.asOf)} (${fmt(Math.round(aDue))})<br>${asmDone}`;
