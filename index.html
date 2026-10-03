@@ -1519,18 +1519,18 @@ function renderMaterials(log) {
   $$('#matChips .chip').forEach(b => b.onclick = () => { S.matStatus = b.dataset.k; renderMaterials(log); });
   if (S.matStatus) rows = rows.filter(r => r.status === S.matStatus);
   rows.sort((a, b) => b.shortfall - a.shortfall || b.remaining_req - a.remaining_req);
-  $('#matTbl').innerHTML = `<thead><tr><th>Material</th><th>Status</th><th>Dept</th><th>Used by</th><th class="n">Planned</th><th class="n">Received</th><th class="n">On hand</th><th class="n" title="Planned qty × units completed ÷ department plan">Theor. use</th><th class="n">Remaining</th><th class="n">Cover</th>
-    <th class="n">Req. to date</th><th class="n">Short</th><th class="n">Short %</th></tr></thead><tbody>` +
+  $('#matTbl').innerHTML = `<thead><tr><th>Material</th><th>Status</th><th>Dept</th><th>Used by</th><th class="n">Planned</th><th class="n" title="On hand = received − issued ± adjusted. A second line shows the received quantity when it differs from the stock on hand.">On hand</th><th class="n" title="Planned qty × units completed ÷ department plan">Theor. use</th><th class="n" title="Planned − theoretical use (whole contract). Hover a value to see how much of it the stock on hand covers.">Remaining</th>
+    <th class="n" title="Planned qty × units due by the as-of date ÷ department plan">Req. to date</th><th class="n" title="Required to date − (receipts ± adjustments), never below zero">Short</th><th class="n" title="Shortfall ÷ required to date">Short %</th></tr></thead><tbody>` +
     (rows.map(m => `<tr><td class="ar" style="text-align:right" title="${esc(m.name_ar)}">${esc(m.name_ar)}</td>
       <td><span class="pill ${m.status}">${MSTAT[m.status]}</span></td><td>${m.stages.map(s => STAGE[s]).join(', ')}</td>
       <td title="${esc(m.product_ids.map(pname).join(', '))}" style="white-space:nowrap">${esc(pname(m.product_ids[0]))}${m.product_ids.length > 1 ? ` <span class="muted">+${m.product_ids.length - 1}</span>` : ''}</td>
-      <td class="n">${fmt2(m.planned)}</td><td class="n">${fmt2(m.received)}</td>
-      <td class="n" title="Received ${fmt2(m.received)} − issued ${fmt2(m.issued)} ${m.adjusted < 0 ? '−' : '+'} adjusted ${fmt2(Math.abs(m.adjusted))}"><b>${fmt2(m.on_hand)}</b></td><td class="n">${fmt2(m.theoretical_use)}</td><td class="n">${fmt2(m.remaining_req)}</td>
-      <td class="n">${m.coverage == null ? '<span class="muted">—</span>' : `<span title="On hand ÷ remaining need" style="color:${m.coverage >= 1 ? 'var(--green)' : m.coverage > 0 ? 'var(--amber)' : 'var(--red)'};font-weight:800">${pct(m.coverage, 0)}</span>`}</td>
+      <td class="n">${fmt2(m.planned)}</td>
+      <td class="n" title="Received ${fmt2(m.received)} − issued ${fmt2(m.issued)} ${m.adjusted < 0 ? '−' : '+'} adjusted ${fmt2(Math.abs(m.adjusted))}"><b>${fmt2(m.on_hand)}</b>${Math.abs(m.received - m.on_hand) > 1e-9 ? `<br><small class="muted">rcvd ${fmt2(m.received)}</small>` : ''}</td><td class="n">${fmt2(m.theoretical_use)}</td><td class="n" title="${m.coverage == null ? '' : `Stock on hand covers ${pct(m.coverage, 0)} of the remaining need`}">${fmt2(m.remaining_req)}</td>
+      
       <td class="n">${fmt2(m.required_to_date)}</td>
       <td class="n" ${m.shortfall > 0 ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt2(m.shortfall)}</td>
       <td class="n" ${m.shortfall_pct >= 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${m.shortfall_pct == null ? '<span class="muted">—</span>' : pct(m.shortfall_pct, 0)}</td></tr>`).join('') ||
-      '<tr><td colspan="13" class="empty-state">No materials match.</td></tr>') + '</tbody>';
+      '<tr><td colspan="11" class="empty-state">No materials match.</td></tr>') + '</tbody>';
   renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material', `No material movements recorded in ${mpl}.`);
 }
 
