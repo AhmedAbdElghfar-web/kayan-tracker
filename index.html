@@ -29,6 +29,7 @@
 @property --dept-bg{syntax:'<color>';inherits:true;initial-value:#eef2f5}
 @property --dept-tint{syntax:'<color>';inherits:true;initial-value:rgba(42,159,201,0)}
 :root{--dept:#2a9fc9;--dept-bg:#eef2f5;--dept-tint:rgba(42,159,201,0);transition:--dept .55s ease,--dept-bg .55s ease,--dept-tint .55s ease}
+:root[data-dept=all]{--dept:#13808a;--dept-bg:#e4f1f2;--dept-tint:rgba(19,128,138,.18)}
 :root[data-dept=chassis]{--dept:#2f6fb5;--dept-bg:#e6eef8;--dept-tint:rgba(47,111,181,.20)}
 :root[data-dept=foam]{--dept:#e07a1f;--dept-bg:#fbeedf;--dept-tint:rgba(224,122,31,.22)}
 :root[data-dept=assembly]{--dept:#6d5bd0;--dept-bg:#ece9fa;--dept-tint:rgba(109,91,208,.20)}
@@ -320,7 +321,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <section class="filters" id="filters" aria-label="Filters">
     <label class="field product"><span>Product</span><select id="fProduct"><option value="">All products</option></select></label>
     <label class="field" data-for="overview"><span>Department</span>
-      <select id="fStage"><option value="chassis">Chassis</option><option value="foam">Foam</option><option value="assembly">Assembly</option></select></label>
+      <select id="fStage"><option value="all">All departments</option><option value="chassis">Chassis</option><option value="foam">Foam</option><option value="assembly">Assembly</option></select></label>
     <label class="field" style="display:none!important"><span>Period</span><select id="fPeriod"></select></label>
     <div class="custom-range" id="customRange" style="display:none!important">
       <label class="field"><span>From</span><input type="date" id="fFrom"></label>
@@ -336,7 +337,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <!-- OVERVIEW -->
   <section data-view="overview">
     <div class="cards">
-      <article class="card"><h3>Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
+      <article class="card"><h3 id="cScopeTitle">Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
       <article class="card amber"><h3 id="cStageTitle">Period output</h3><div class="metric" id="cStage">—</div><div class="sub" id="cStageSub"></div></article>
       <article class="card amber"><h3 id="cAsmTitle">Assembly plan backlog</h3><div class="metric" id="cAsm">—</div><div class="sub" id="cAsmSub"></div></article>
       <article class="card"><h3 id="cRateTitle">Required per day</h3><div class="metric" id="cRate">—</div><div class="sub" id="cRateSub"></div></article>
@@ -781,7 +782,7 @@ const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', '
 const dshort = s => { const d = parseISO(s); return `${d.getDate()} ${MON[d.getMonth()]}`; };
 const dlong = s => { const d = parseISO(s); return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`; };
 const lastDay = (y, m) => new Date(y, m + 1, 0).getDate();
-const STAGE = { chassis: 'Chassis', foam: 'Foam', assembly: 'Assembly' };   // = departments: welding, foam injection, assembly/upholstery
+const STAGE = { all: 'All departments', chassis: 'Chassis', foam: 'Foam', assembly: 'Assembly' };   // = departments: welding, foam injection, assembly/upholstery
 const RISK = { critical: 'Critical', at_risk: 'At risk', on_track: 'On track', na: 'No plan in period' };
 const MSTAT = { zero: 'At zero', short: 'Short', covered: 'Covered', complete: 'Complete' };
 
@@ -1146,7 +1147,7 @@ function renderOverviewRate() {
     if (!tp) return { r, backlog: Math.max(0, r.due - r.done), plan: 0, bpd: null, need: 0, req: null, actual };
     let need, backlog;
     if (fut) {   // target date: need = plan due by the target date − output; backlog = plan due by today − output
-      const dt = S.dueToday.get(r.id) ?? r.due;
+      const dt = S.dueToday.get(r.key) ?? r.due;
       need = Math.max(0, r.due - r.done); backlog = Math.min(need, Math.max(0, dt - r.done));
     } else {     // today / past: backlog to the as-of date + the open part of the running (or next) period, net of the model's surplus
       const rawBack = Math.max(0, r.due - r.done), planDay = planAt.get(r.id) ?? 0;
@@ -1205,32 +1206,52 @@ function renderOverviewRate() {
 }
 
 /* ====================== rendering: overview ====================== */
+async function fetchDash(stage, asOf) {
+  const d = await rpc('kayan_dashboard', { p_stage: stage, p_from: S.from, p_to: S.to, p_as_of: asOf, p_product_ids: productIds(), p_risk: null });
+  d.products = (d.products || []).map(r => ({ ...r, stage, key: r.id + '|' + stage }));
+  return d;
+}
+// All departments = the three department payloads side by side: one row per product × department, counts added up
+function mergeDash(parts) {
+  const rows = parts.flatMap(d => d.products.map(r => ({ ...r, name_en: `${r.name_en} · ${STAGE[r.stage]}` })));
+  const sm = k => parts.reduce((a, d) => a + (d.summary[k] || 0), 0), target = sm('target'), due = sm('due'), done = sm('done');
+  const rc = {}; parts.forEach(d => Object.entries(d.summary.reason_counts || {}).forEach(([k, v]) => rc[k] = (rc[k] || 0) + v));
+  const wr = target ? rows.reduce((a, r) => a + (r.target || 0) * (r.due > 0 ? Math.min(1, r.done / r.due) : 0), 0) / target : null;
+  return { ...parts[0], stage: 'all', products: rows,
+    data_through: parts.map(d => d.data_through).filter(Boolean).sort().at(-1) || null,
+    summary: { na: sm('na'), due, done, target, at_risk: sm('at_risk'), in_view: sm('in_view'), approved: sm('approved'), critical: sm('critical'),
+      on_track: sm('on_track'), with_output: sm('with_output'), material_zero: sm('material_zero'), reason_counts: rc,
+      achievement: due ? done / due : null, weighted_readiness: wr } };
+}
+const fetchDashAny = async asOf => S.stage === 'all' ? mergeDash(await Promise.all(['chassis', 'foam', 'assembly'].map(st => fetchDash(st, asOf)))) : fetchDash(S.stage, asOf);
 async function loadOverview() {
   if (!S.from || !S.to || S.to < S.from) { banner('Choose a valid period (To must be on or after From).'); return; }
   const today = localISO();
   const [dash, ds, dm, dashT, dashA] = await Promise.all([
-    rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: S.asOf,
-      p_product_ids: productIds(), p_risk: S.risk || null }),
+    fetchDashAny(S.asOf),
     rpc('kayan_delivery_status', { p_as_of: S.asOf }),
     rpc('kayan_delivery_matrix', { p_as_of: S.asOf }),
     // as-of date in the future = target date: the plan due by today is needed to split backlog (to date) from plan still to come
-    S.asOf > today ? rpc('kayan_dashboard', { p_stage: S.stage, p_from: S.from, p_to: S.to, p_as_of: today,
-      p_product_ids: productIds(), p_risk: null }) : Promise.resolve(null),
-    // assembly plan due by the as-of date, for the assembly shortfall on the Assembly card
-    S.stage === 'assembly' ? Promise.resolve(null) : rpc('kayan_dashboard', { p_stage: 'assembly', p_from: S.from, p_to: S.to, p_as_of: S.asOf,
-      p_product_ids: productIds(), p_risk: null }),
+    S.asOf > today ? fetchDashAny(today) : Promise.resolve(null),
+    // assembly plan due by the as-of date, for the assembly backlog on the Assembly card
+    S.stage === 'assembly' || S.stage === 'all' ? Promise.resolve(null) : fetchDash('assembly', S.asOf),
   ]);
-  S.dash = dash; S.dstat = ds; S.dm = dm; S.asmDash = dashA || dash;
-  S.dueToday = dashT ? new Map(dashT.products.map(r => [r.id, r.due])) : null;
+  S.dash = dash; S.dstat = ds; S.dm = dm;
+  S.asmDash = dashA || (S.stage === 'all' ? { ...dash, products: dash.products.filter(r => r.stage === 'assembly') } : dash);
+  S.dueToday = dashT ? new Map(dashT.products.map(r => [r.key, r.due])) : null;
   renderOverview(); renderDeliveryStatus(); renderOverviewRate();
 }
 function renderOverview() {
   const D = S.dash; if (!D) return;
   const sm = D.summary, pr = D.project, stg = STAGE[S.stage];
   $('#dataThrough').textContent = D.data_through ? dlong(D.data_through) : 'No entries yet';
-  $('#inView').textContent = `${sm.in_view} ${stg.toLowerCase()} product${sm.in_view === 1 ? '' : 's'} in view`;
-  $('#cScope').textContent = fmt(pr.scope);
-  $('#cScopeSub').innerHTML = `${pr.products} product${pr.products === 1 ? '' : 's'} · ${S.product ? 'selected' : 'full order'}<br>Delivered to client: ${fmt(pr.delivered)} (${pct(pr.scope ? pr.delivered / pr.scope : null)})`;
+  $('#inView').textContent = S.stage === 'all' ? `${sm.in_view} product lines in view (product × department)` : `${sm.in_view} ${stg.toLowerCase()} product${sm.in_view === 1 ? '' : 's'} in view`;
+  // scope of the selected department = department plan quantity of the products in view (All departments: the three added up)
+  const scopeRows = D.products, deptScope = scopeRows.reduce((a, r) => a + (r.stage_scope || 0), 0), nProd = new Set(scopeRows.map(r => r.id)).size;
+  $('#cScopeTitle').textContent = `${stg} scope`;
+  $('#cScope').textContent = fmt(deptScope);
+  $('#cScopeSub').innerHTML = `${nProd} product${nProd === 1 ? '' : 's'} · ${S.product ? 'selected' : S.stage === 'all' ? 'full order' : 'in this department'}` +
+    `${S.stage === 'all' ? ` · ${scopeRows.length} department lines` : ''}<br>Contract ${fmt(pr.scope)} · delivered to client ${fmt(pr.delivered)} (${pct(pr.scope ? pr.delivered / pr.scope : null)})`;
   $('#cStageTitle').textContent = `${periodShort()} ${stg.toLowerCase()}`;
   $('#cStage').innerHTML = `${fmt(sm.done)} <small>/</small> ${fmt(sm.target)}`;
   $('#cStageSub').textContent = sm.target ? `${pct(sm.achievement)} achieved · ${fmt(sm.due)} due to date` : 'No plan quantity in this period';
