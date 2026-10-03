@@ -925,11 +925,12 @@ function applyDeptTheme(swap) {
 function productIds() { return S.product ? [Number(S.product)] : null; }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
 
-/* ====================== month filter (production / materials / assembly) ====================== */
-// These views take a month instead of a day. Status date = last day of the selected month, always:
-// plan is counted to month end, actuals are whatever has been recorded (nothing after today).
-const MONTHLY = ['production', 'assembly'];   // month filter; Materials uses the As-of filter (plan required to the end of each delivery period)
-const ASOF_TABS = ['overview', 'materials'];
+/* ====================== status date (production / materials / assembly) ====================== */
+// These views use the same As-of filter as the Overview: choose Today, the end of a delivery period, or a custom date.
+// Plan is counted to that date; actuals are whatever has been recorded (nothing after today). The KPI strip and the log
+// follow the delivery period that contains the date. The old month helpers below are no longer used.
+const MONTHLY = [];   // the Month filter is no longer used: every status view takes the As-of filter (plan required to the end of each delivery period)
+const ASOF_TABS = ['overview', 'production', 'materials', 'assembly'];
 const monthLabel = (m = S.month) => { const [y, mm] = m.split('-').map(Number); return `${MONTH[mm - 1]} ${y}`; };
 const monthName = (m = S.month) => MONTH[Number(m.slice(5, 7)) - 1];
 function monthOptions() {
@@ -940,6 +941,7 @@ function monthOptions() {
 function monthRange(m = S.month) { const [y, mm] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}` }; }
 // delivery period containing the date (else the last one that started before it, else the first)
 function periodOf(a) { const P = S.ref.periods; return P.find(p => p.s <= a && p.e >= a) || [...P].reverse().find(p => p.s <= a) || P[0]; }
+const periodLabel = a => { const p = periodOf(a); return `${dshort(p.s)}–${dshort(p.e)}`; };
 function viewAsOf() { return MONTHLY.includes(S.tab) ? monthRange().to : S.asOf; }
 function prevMonth(m = S.month) { const [y, mm] = m.split('-').map(Number); return mm === 1 ? `${y - 1}-12` : `${y}-${pad(mm - 1)}`; }
 function setStatusLine() {
@@ -1352,7 +1354,7 @@ function mini(done, plan) {
 
 /* ====================== production ====================== */
 async function loadProduction() {
-  const A = viewAsOf(), r = monthRange();
+  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
   const [matrix, log, flow, ser] = await Promise.all([
     rpc('kayan_stage_matrix', { p_as_of: A }),
     q(sb.from('kayan_production_entries').select('*').eq('deleted', false).gte('entry_date', r.from).lte('entry_date', r.to)
@@ -1373,7 +1375,7 @@ function renderProdChart() {
     .map(x => ({ s: x.s, k: x.p, plan: x.plan, due: x.due, act: x.done || 0 }));
   const per = buildSeries(items, A);
   $('#pcEyebrow').textContent = `${DEPT[st]} by delivery period`;
-  renderSeriesPanel('pc', per, A, { plan: 'Planned', act: 'Output', gap: 'Output backlog', gapWord: 'backlog' });
+  renderSeriesPanel('pc', per, A, { plan: 'Planned', act: 'Output', gap: 'Output backlog', gapWord: 'backlog' }, undefined, true);
   $('#pcHint').textContent = `Planned = client delivery plan of the models that pass through ${DEPT[st].toLowerCase()}, per period; the period containing the status date is pro-rated by days. ` +
     `Output = complete units (sets) finished in the period. Backlog = Σ per model of max(0, plan due − output), cumulative. ` +
     `Contract quantity with no delivery date (Spanish chair) is not in the plan bars.`;
@@ -1381,7 +1383,7 @@ function renderProdChart() {
 function renderProduction(log) {
   const pids = productIds();
   renderProdCards(); renderProdChart();
-  $('#prodLogTitle').textContent = `Production entries in ${monthLabel()}`;
+  $('#prodLogTitle').textContent = `Production entries in the period ${periodLabel(viewAsOf())}`;
   if (S.prodDept) log = log.filter(r => r.stage === S.prodDept);
   const byP = new Map();
   S.matrix.forEach(m => { if (!byP.has(m.product_id)) byP.set(m.product_id, {}); byP.get(m.product_id)[m.stage] = m; });
@@ -1400,7 +1402,7 @@ function renderProduction(log) {
     const toggle = () => { const r = $(`#matrixTbl tr[data-for="${tr.dataset.pid}"]`); r.hidden = !r.hidden; };
     tr.onclick = toggle; tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
   });
-  renderLog('#prodLog', log.filter(r => !pids || pids.includes(r.product_id)), 'production', `No production recorded in ${monthLabel()}.`);
+  renderLog('#prodLog', log.filter(r => !pids || pids.includes(r.product_id)), 'production', `No production recorded in ${periodLabel(viewAsOf())}.`);
 }
 function renderProdCards() {
   const pids = productIds();
@@ -1534,7 +1536,7 @@ function renderMaterials(log) {
 
 /* ====================== assembly & delivery ====================== */
 async function loadAssembly() {
-  const A = viewAsOf(), r = monthRange();
+  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
   const [dm, log, dash, flow, dstat] = await Promise.all([
     rpc('kayan_delivery_matrix', { p_as_of: A }),
     q(sb.from('kayan_deliveries').select('*').eq('deleted', false).gte('delivery_date', r.from).lte('delivery_date', r.to)
@@ -1555,7 +1557,7 @@ function renderAsmChart(ds) {
   const per = buildSeries(items, A);
   const back = ds.reduce((a, r) => a + r.backlog, 0);   // server basis, same as the Backlog card
   const cur = per.find(p => p.s <= A && p.e >= A); if (cur) cur.gap = back;
-  renderSeriesPanel('ac', per, A, { plan: 'Planned', act: 'Delivered', gap: 'Delivery backlog', gapWord: 'backlog' }, back);
+  renderSeriesPanel('ac', per, A, { plan: 'Planned', act: 'Delivered', gap: 'Delivery backlog', gapWord: 'backlog' }, back, true);
   $('#acHint').textContent = 'Same basis as the Overview delivery panel: client delivery schedule per period, the period containing the status date pro-rated by days. Backlog = Σ per model of max(0, plan due − delivered), cumulative.';
 }
 function renderAssembly(log, dash) {
@@ -1569,7 +1571,7 @@ function renderAssembly(log, dash) {
   const dueToDate = ds.reduce((a, r) => a + r.due, 0);
   const A = viewAsOf();
   renderAsmChart(ds);
-  $('#delLogTitle').textContent = `Client deliveries in ${monthLabel()}`;
+  $('#delLogTitle').textContent = `Client deliveries in the period ${periodLabel(viewAsOf())}`;
   $('#aDone').innerHTML = `${fmt(dash.assembly.done)} <small>/</small> ${fmt(dash.assembly.scope)}`;
   const ready = S.flow.filter(r => !pids || pids.includes(r.product_id)).reduce((a, r) => a + (r.ready_to_assemble || 0), 0);
   $('#aDoneSub').textContent = `${pct(dash.assembly.scope ? dash.assembly.done / dash.assembly.scope : null)} of assembly scope · ${fmt(ready)} ready to assemble from chassis + foam`;
@@ -1587,7 +1589,7 @@ function renderAssembly(log, dash) {
     return r.delivered >= r.planned ? 'met' : 'short';
   };
   const tot = periods.map(p => ({ plan: 0, del: 0 }));
-  $('#dmTbl').innerHTML = `<thead><tr><th>Product</th>${periods.map(p => `<th class="n" ${p.s.slice(0, 7) === S.month ? 'style="background:#e9f4f9;color:var(--teal-d)"' : ''}>${dshort(p.s)}–${dshort(p.e)}</th>`).join('')}<th class="n">Plan total</th><th class="n">Contract</th></tr></thead><tbody>` +
+  $('#dmTbl').innerHTML = `<thead><tr><th>Product</th>${periods.map(p => `<th class="n" ${p.s === periodOf(viewAsOf()).s ? 'style="background:#e9f4f9;color:var(--teal-d)"' : ''}>${dshort(p.s)}–${dshort(p.e)}</th>`).join('')}<th class="n">Plan total</th><th class="n">Contract</th></tr></thead><tbody>` +
     prods.map(p => { const m = byP.get(p.id) || {}; let pt = 0;
       return `<tr><td class="pname"><b>${esc(p.name_en)}</b></td>${periods.map((per, i) => { const r = m[per.s];
         if (r) { tot[i].plan += r.planned; tot[i].del += r.delivered; pt += r.planned; }
@@ -1595,7 +1597,7 @@ function renderAssembly(log, dash) {
         return `<td class="cell ${c}" title="${r?.note ? esc(r.note) : ''}">${c === 'empty' ? (r?.note ? esc(r.note) : '·') : `${fmt(r.delivered)} / ${fmt(r.planned)}`}</td>`; }).join('')}
         <td class="n">${fmt(pt)}</td><td class="n ${pt !== p.total_qty ? '' : ''}" ${pt !== p.total_qty ? `style="color:var(--red);font-weight:800" title="Scheduled ${fmt(pt)} vs contract ${fmt(p.total_qty)}"` : ''}>${fmt(p.total_qty)}</td></tr>`; }).join('') +
     `<tr><td><b>Total</b></td>${tot.map(t => `<td class="cell"><b>${fmt(t.del)} / ${fmt(t.plan)}</b></td>`).join('')}<td class="n"><b>${fmt(tot.reduce((a, t) => a + t.plan, 0))}</b></td><td class="n"><b>${fmt(contract)}</b></td></tr></tbody>`;
-  renderLog('#delLog', log.filter(r => !pids || pids.includes(r.product_id)), 'delivery', `No client deliveries recorded in ${monthLabel()}.`);
+  renderLog('#delLog', log.filter(r => !pids || pids.includes(r.product_id)), 'delivery', `No client deliveries recorded in ${periodLabel(viewAsOf())}.`);
 }
 
 /* ====================== logs & voids ====================== */
@@ -2056,7 +2058,7 @@ async function refresh() {
       if (S.tab === 'materials') await loadMaterials();
       if (S.tab === 'assembly') await loadAssembly();
       if (S.tab === 'daily') await loadDaily();
-      if (MONTHLY.includes(S.tab) || S.tab === 'materials') setStatusLine();
+      if (ASOF_TABS.includes(S.tab) && S.tab !== 'overview') setStatusLine();
       if (S.tab === 'record') { renderApprovals(); buildRecordForms(); }
     } catch (e) { banner('Could not load data: ' + errMsg(e)); }
     finally { main.classList.remove('loading'); refreshing = null; if (again) { again = false; refresh(); } }
