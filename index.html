@@ -1116,20 +1116,27 @@ function renderOverviewRate() {
   //   as to-produce − plan / day × days left, so that the three figures always reconcile.
   const cOff = BASIS.cal.off, calFull = tp && !fut ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
         calLeft = tp && !fut ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0;
+  // A model's own surplus (output above the plan due) is carried against the plan still to come, so a model that is already
+  // ahead of the plan needs nothing more; a surplus on one model never offsets another model.
   const rows = D.products.map(r => {
-    if (fut) {   // backlog = plan due by today − output; still to come = plan due by the target date − plan due by today
-      const dt = S.dueToday.get(r.id) ?? r.due, back = Math.max(0, dt - r.done), rem = Math.max(0, r.due - dt);
-      const plan = tp ? rem / tp.days : 0, bpd = tp ? back / tp.days : null;
-      return { r, backlog: back, plan, bpd, need: tp ? back + rem : 0, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
+    const actual = elapsed ? r.done / elapsed : null;
+    if (!tp) return { r, backlog: Math.max(0, r.due - r.done), plan: 0, bpd: null, need: 0, req: null, actual };
+    let need, backlog;
+    if (fut) {   // target date: need = plan due by the target date − output; backlog = plan due by today − output
+      const dt = S.dueToday.get(r.id) ?? r.due;
+      need = Math.max(0, r.due - r.done); backlog = Math.min(need, Math.max(0, dt - r.done));
+    } else {     // today / past: backlog to the as-of date + the open part of the running (or next) period, net of the model's surplus
+      const rawBack = Math.max(0, r.due - r.done), planDay = planAt.get(r.id) ?? 0;
+      const rem = calFull ? planDay * tp.full * calLeft / calFull : 0;
+      need = rawBack + Math.max(0, rem - Math.max(0, r.done - r.due));
+      backlog = Math.max(0, need - planDay * tp.days);
     }
-    const rawBack = Math.max(0, r.due - r.done), plan = planAt.get(r.id) ?? 0;
-    const need = tp && calFull ? rawBack + plan * tp.full * calLeft / calFull : 0;
-    const backlog = tp ? Math.max(0, need - plan * tp.days) : rawBack, bpd = tp ? backlog / tp.days : null;
-    return { r, backlog, plan, bpd, need, req: tp ? plan + bpd : null, actual: elapsed ? r.done / elapsed : null };
+    const bpd = backlog / tp.days, plan = (need - backlog) / tp.days;
+    return { r, backlog, plan, bpd, need, req: need / tp.days, actual };
   });
   const sum = f => rows.reduce((a, x) => a + (f(x) || 0), 0);
   const dueT = sum(x => x.r.due), doneT = sum(x => x.r.done), backT = sum(x => x.backlog);
-  const planT = sum(x => x.plan), bpdT = tp ? backT / tp.days : 0, reqT = planT + bpdT, actT = sum(x => x.actual);
+  const planT = sum(x => x.plan), bpdT = sum(x => x.bpd), reqT = planT + bpdT, actT = sum(x => x.actual);
   const range = tp ? `${dshort(tp.p.s)}–${dshort(tp.p.e)}` : '';
   const needT = sum(x => x.need);
 
