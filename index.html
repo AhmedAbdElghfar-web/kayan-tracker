@@ -326,8 +326,8 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <label class="field"><span>From</span><input type="date" id="fFrom"></label>
       <label class="field"><span>To</span><input type="date" id="fTo"></label>
     </div>
-    <label class="field" data-for="overview"><span>As of</span><select id="fAsOfSel"></select></label>
-    <label class="field" data-for="overview" id="asOfCustom" style="display:none"><span>Date</span><input type="date" id="fAsOf"></label>
+    <label class="field" data-for="asof"><span>As of</span><select id="fAsOfSel"></select></label>
+    <label class="field" data-for="custom" id="asOfCustom" style="display:none"><span>Date</span><input type="date" id="fAsOf"></label>
     <label class="field" data-for="monthly"><span>Month</span><select id="fMonth"></select></label>
     <button class="linkbtn" id="resetBtn" type="button">Reset filters</button>
     <span class="inview" id="inView"></span>
@@ -928,7 +928,8 @@ const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
 /* ====================== month filter (production / materials / assembly) ====================== */
 // These views take a month instead of a day. Status date = last day of the selected month, always:
 // plan is counted to month end, actuals are whatever has been recorded (nothing after today).
-const MONTHLY = ['production', 'materials', 'assembly'];
+const MONTHLY = ['production', 'assembly'];   // month filter; Materials uses the As-of filter (plan required to the end of each delivery period)
+const ASOF_TABS = ['overview', 'materials'];
 const monthLabel = (m = S.month) => { const [y, mm] = m.split('-').map(Number); return `${MONTH[mm - 1]} ${y}`; };
 const monthName = (m = S.month) => MONTH[Number(m.slice(5, 7)) - 1];
 function monthOptions() {
@@ -937,6 +938,8 @@ function monthOptions() {
   return [...set].sort().map(m => ({ key: m, label: monthLabel(m) }));
 }
 function monthRange(m = S.month) { const [y, mm] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}` }; }
+// delivery period containing the date (else the last one that started before it, else the first)
+function periodOf(a) { const P = S.ref.periods; return P.find(p => p.s <= a && p.e >= a) || [...P].reverse().find(p => p.s <= a) || P[0]; }
 function viewAsOf() { return MONTHLY.includes(S.tab) ? monthRange().to : S.asOf; }
 function prevMonth(m = S.month) { const [y, mm] = m.split('-').map(Number); return mm === 1 ? `${y - 1}-12` : `${y}-${pad(mm - 1)}`; }
 function setStatusLine() {
@@ -961,7 +964,7 @@ function buildSeries(items, asOf) {
   return per;
 }
 // Same chart as the Overview delivery panel: planned bars, actual bars, dashed cumulative gap line.
-function tlSVG(per, asOf, { month = null, aria = 'Planned versus actual by period', gapWord = 'backlog' } = {}) {
+function tlSVG(per, asOf, { month = null, periodS = null, aria = 'Planned versus actual by period', gapWord = 'backlog' } = {}) {
   const today = localISO();
   const W = 1000, H = 230, L = 10, R = 10, T = 26, B = 46, cw = (W - L - R) / Math.max(1, per.length);
   const max = Math.max(1, ...per.map(p => Math.max(p.plan, p.act, p.gap || 0)));
@@ -969,7 +972,7 @@ function tlSVG(per, asOf, { month = null, aria = 'Planned versus actual by perio
   const bw = Math.min(46, cw * 0.32);
   let svg = `<svg class="tl" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
   per.forEach((p, i) => {
-    const x0 = L + i * cw, x = x0 + cw / 2, now = p.s <= asOf && p.e >= asOf, inM = month && p.s.slice(0, 7) === month;
+    const x0 = L + i * cw, x = x0 + cw / 2, now = p.s <= asOf && p.e >= asOf, inM = (month && p.s.slice(0, 7) === month) || (periodS && p.s === periodS);
     if (inM && !now) svg += `<rect x="${x0}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#e9f4f9"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:var(--teal-d);font-weight:800">${monthName(month)}</text>`;
     if (now) svg += `<rect x="${x0}" y="${T - 20}" width="${cw}" height="${H - T - B + 20}" fill="#fff7e6"/><text x="${x}" y="${T - 8}" text-anchor="middle" style="fill:#a8700b;font-weight:800">${asOf === today ? 'today' : 'as of ' + dshort(asOf)}</text>`;
     svg += `<rect x="${x - bw - 2}" y="${y(p.plan)}" width="${bw}" height="${H - B - y(p.plan)}" rx="3" fill="#cfd9e1"/>`;
@@ -987,25 +990,32 @@ function tlSVG(per, asOf, { month = null, aria = 'Planned versus actual by perio
 }
 // KPI strip + chart for a monthly view. lbl = { plan, act, gap, gapWord }
 // Carried in = cumulative gap at the end of the previous month (last period of that month).
-function renderSeriesPanel(pfx, per, asOf, lbl, gapOverride) {
-  const inM = per.filter(p => p.s.slice(0, 7) === S.month);
-  const pm = prevMonth(), inPrev = per.filter(p => p.s.slice(0, 7) === pm);
+function renderSeriesPanel(pfx, per, asOf, lbl, gapOverride, byPeriod = false) {
+  let inM, inPrev, mn, pn, curS = null;
+  if (byPeriod) {   // the delivery period that contains the as-of date, and the one before it
+    const cur = periodOf(asOf), ci = per.findIndex(p => p.s === cur.s);
+    inM = ci >= 0 ? [per[ci]] : []; inPrev = ci > 0 ? [per[ci - 1]] : []; curS = cur.s;
+    mn = `${dshort(cur.s)}–${dshort(cur.e)}`; pn = inPrev.length ? `${dshort(inPrev[0].s)}–${dshort(inPrev[0].e)}` : 'previous period';
+  } else {
+    inM = per.filter(p => p.s.slice(0, 7) === S.month); inPrev = per.filter(p => p.s.slice(0, 7) === prevMonth());
+    mn = monthName(); pn = monthName(prevMonth());
+  }
   const sum = (arr, k) => arr.reduce((a, p) => a + (p[k] || 0), 0);
   const mPlan = sum(inM, 'plan'), mAct = sum(inM, 'act');
   const cumDue = sum(per, 'due'), cumAct = sum(per.filter(p => p.s <= asOf), 'act');
   const lastGap = [...per].reverse().find(p => p.gap != null)?.gap ?? 0;
-  const gap = gapOverride ?? lastGap, mn = monthName(), pn = monthName(pm);
+  const gap = gapOverride ?? lastGap;
   const carried = inPrev.length ? (inPrev.at(-1).gap ?? 0) : 0;
   const target = carried + mPlan;
   $(`#${pfx}Kpis`).className = 'kpis six';
   $(`#${pfx}Kpis`).innerHTML = `
-    <div class="${carried ? 'bad' : ''}"><span>${lbl.gap} from ${pn}</span><b>${fmt(carried)}</b><small>${inPrev.length ? `Open at ${dshort(inPrev.at(-1).e)}, carried into ${mn}` : `No plan in ${pn}`}</small></div>
-    <div><span>${mn} ${lbl.plan.toLowerCase()}</span><b>${fmt(mPlan)}</b><small>${inM.length ? `${inM.length} delivery period${inM.length === 1 ? '' : 's'}` : 'No delivery period in this month'}</small></div>
+    <div class="${carried ? 'bad' : ''}"><span>${lbl.gap} from ${pn}</span><b>${fmt(carried)}</b><small>${inPrev.length ? `Open at ${dshort(inPrev.at(-1).e)}, carried into ${byPeriod ? 'this period' : mn}` : byPeriod ? 'No earlier period' : `No plan in ${pn}`}</small></div>
+    <div><span>${mn} ${lbl.plan.toLowerCase()}</span><b>${fmt(mPlan)}</b><small>${inM.length ? `${inM.length} delivery period${inM.length === 1 ? '' : 's'}` : byPeriod ? 'No delivery period' : 'No delivery period in this month'}</small></div>
     <div><span>${mn} total to cover</span><b>${fmt(target)}</b><small>${fmt(carried)} carried in + ${fmt(mPlan)} plan</small></div>
-    <div><span>${mn} ${lbl.act.toLowerCase()}</span><b>${fmt(mAct)}</b><small>${target ? `${pct(mAct / target)} of the total to cover` : 'Nothing to cover this month'}</small></div>
+    <div><span>${mn} ${lbl.act.toLowerCase()}</span><b>${fmt(mAct)}</b><small>${target ? `${pct(mAct / target)} of the total to cover` : byPeriod ? 'Nothing to cover in this period' : 'Nothing to cover this month'}</small></div>
     <div><span>${lbl.act} to date</span><b>${fmt(cumAct)}</b><small>${pct(cumDue ? cumAct / cumDue : null)} of ${fmt(cumDue)} ${lbl.plan.toLowerCase()} to ${dshort(asOf)}</small></div>
     <div class="${gap ? 'bad' : ''}"><span>${lbl.gap} at ${dshort(asOf)}</span><b>${fmt(gap)}</b><small>${gap - carried > 0 ? `+${fmt(gap - carried)}` : gap - carried < 0 ? `−${fmt(carried - gap)}` : 'No change'} vs end of ${pn}</small></div>`;
-  $(`#${pfx}Chart`).innerHTML = tlSVG(per, asOf, { month: S.month, aria: `${lbl.plan} versus ${lbl.act.toLowerCase()} by delivery period`, gapWord: lbl.gapWord });
+  $(`#${pfx}Chart`).innerHTML = tlSVG(per, asOf, { month: byPeriod ? null : S.month, periodS: curS, aria: `${lbl.plan} versus ${lbl.act.toLowerCase()} by delivery period`, gapWord: lbl.gapWord });
 }
 
 /* ====================== daily rate (one tab per department) ====================== */
@@ -1459,7 +1469,7 @@ function compDetail(s, cols) {
 
 /* ====================== materials ====================== */
 async function loadMaterials() {
-  const A = viewAsOf(), r = monthRange();
+  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
   const [st, log, ser] = await Promise.all([
     rpc('kayan_material_status', { p_as_of: A, p_lead_days: S.matLead }),
     q(sb.from('kayan_material_txns').select('*').eq('deleted', false).gte('txn_date', r.from).lte('txn_date', r.to)
@@ -1474,7 +1484,7 @@ function renderMatChart(rows) {
     .map(x => ({ s: x.s, k: x.m, plan: Number(x.req), due: Number(x.due), act: Number(x.sup || 0) }));
   const per = buildSeries(items, A);
   const shortTD = rows.reduce((a, r) => a + Number(r.shortfall), 0);
-  renderSeriesPanel('mc', per, A, { plan: 'Required', act: 'Supplied', gap: 'Shortfall to date', gapWord: 'short' }, Math.round(shortTD));
+  renderSeriesPanel('mc', per, A, { plan: 'Required', act: 'Supplied', gap: 'Shortfall to date', gapWord: 'short' }, Math.round(shortTD), true);
   const uoms = [...new Set(rows.map(r => r.uom).filter(Boolean))];
   $('#mcHint').textContent = `Required = planned qty × units due in the period ÷ department plan${S.matLead ? `, shifted ${S.matLead} days earlier for lead time` : ''}. ` +
     `Supplied = receipts + adjustments dated in the period. Shortfall = Σ per material of max(0, required − supplied), cumulative. ` +
@@ -1489,7 +1499,8 @@ function renderMaterials(log) {
   $$('#deptChips .chip').forEach(b => b.onclick = () => { S.matDept = b.dataset.d; renderMaterials(log); });
   if (S.matDept) rows = rows.filter(r => r.stages.includes(S.matDept));
   renderMatChart(rows);
-  $('#matLogTitle').textContent = `Material movements in ${monthLabel()}`;
+  const mp = periodOf(viewAsOf()), mpl = `${dshort(mp.s)}–${dshort(mp.e)}`;
+  $('#matLogTitle').textContent = `Material movements in the period ${mpl}`;
   const c = { zero: 0, short: 0, covered: 0, complete: 0 }; rows.forEach(r => c[r.status]++);
   const reqTD = rows.reduce((a, r) => a + Number(r.required_to_date), 0);
   const shortTD = rows.reduce((a, r) => a + Number(r.shortfall), 0);
@@ -1518,7 +1529,7 @@ function renderMaterials(log) {
       <td class="n" ${m.shortfall > 0 ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt2(m.shortfall)}</td>
       <td class="n" ${m.shortfall_pct >= 0.5 ? 'style="color:var(--red);font-weight:800"' : ''}>${m.shortfall_pct == null ? '<span class="muted">—</span>' : pct(m.shortfall_pct, 0)}</td></tr>`).join('') ||
       '<tr><td colspan="13" class="empty-state">No materials match.</td></tr>') + '</tbody>';
-  renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material', `No material movements recorded in ${monthLabel()}.`);
+  renderLog('#matLog', log.filter(r => !pids || !r.product_id || pids.includes(r.product_id)), 'material', `No material movements recorded in ${mpl}.`);
 }
 
 /* ====================== assembly & delivery ====================== */
@@ -2024,7 +2035,8 @@ function showTab(tab) {
   $$('nav.tabs [role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
   $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== tab);
   $$('#filters [data-for=overview]').forEach(el => el.style.display = tab === 'overview' ? '' : 'none');
-  $('#asOfCustom').style.display = tab === 'overview' && S.asOfMode === 'custom' ? '' : 'none';  // custom date box only in Custom mode
+  $$('#filters [data-for=asof]').forEach(el => el.style.display = ASOF_TABS.includes(tab) ? '' : 'none');
+  $('#asOfCustom').style.display = ASOF_TABS.includes(tab) && S.asOfMode === 'custom' ? '' : 'none';  // custom date box only in Custom mode
   $$('#filters [data-for=monthly]').forEach(el => el.style.display = MONTHLY.includes(tab) ? '' : 'none');
   $('#filters').hidden = tab === 'record';
   if (tab === 'overview') $('#customRange').classList.toggle('on', S.period === 'custom');
@@ -2044,7 +2056,7 @@ async function refresh() {
       if (S.tab === 'materials') await loadMaterials();
       if (S.tab === 'assembly') await loadAssembly();
       if (S.tab === 'daily') await loadDaily();
-      if (MONTHLY.includes(S.tab)) setStatusLine();
+      if (MONTHLY.includes(S.tab) || S.tab === 'materials') setStatusLine();
       if (S.tab === 'record') { renderApprovals(); buildRecordForms(); }
     } catch (e) { banner('Could not load data: ' + errMsg(e)); }
     finally { main.classList.remove('loading'); refreshing = null; if (again) { again = false; refresh(); } }
