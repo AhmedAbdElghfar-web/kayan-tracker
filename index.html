@@ -209,6 +209,17 @@ form select,form input,form textarea{font-size:16px;min-height:46px;padding:10px
 .kpis b{display:block;font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:4px}
 .kpis small{color:var(--muted);font-size:13px}
 .kpis .bad b{color:var(--red)}
+.kpis .good b{color:var(--green)}
+/* delivered in full according to the plan */
+.okb{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:13px;font-weight:900;line-height:1;margin-left:9px;vertical-align:middle;animation:okPop .55s cubic-bezier(.3,1.5,.5,1) both,okPulse 2.4s ease-out .6s 2}
+.okb.full{width:auto;padding:0 9px;border-radius:999px;font-size:12px;letter-spacing:.04em}
+tr.ok-row td{background:rgba(31,157,107,.075)}
+tr.ok-row td:first-child{box-shadow:inset 5px 0 0 var(--green)}
+tr.ok-row .pname b{color:#146b49}
+.okv{color:var(--green);font-weight:900}
+@keyframes okPop{0%{transform:scale(0) rotate(-40deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes okPulse{0%{box-shadow:0 0 0 0 rgba(31,157,107,.45)}100%{box-shadow:0 0 0 12px rgba(31,157,107,0)}}
+@media (prefers-reduced-motion:reduce){.okb{animation:none}}
 .kpis.six{grid-template-columns:repeat(6,1fr)}
 @media (max-width:1100px){.kpis.six{grid-template-columns:repeat(3,1fr)}.kpis.six div:nth-child(4){border-left:0}.kpis.six div:nth-child(n+4){border-top:1px solid var(--line)}}
 .tl{width:100%;height:auto;display:block}
@@ -1273,7 +1284,7 @@ function renderDeliveryStatus() {
     <div><span>Contract</span><b>${fmt(contract)}</b><small>${rows.length} product${rows.length === 1 ? '' : 's'}</small></div>
     <div><span>Plan due by ${dshort(S.asOf)}</span><b>${fmt(due)}</b><small>${pct(contract ? due / contract : null)} of contract</small></div>
     <div><span>Delivered</span><b>${fmt(del)}</b><small>${pct(due ? del / due : null)} of due · ${pct(contract ? del / contract : null)} of contract</small></div>
-    <div class="${back ? 'bad' : ''}"><span>Backlog</span><b>${fmt(back)}</b><small>${rows.filter(r => r.backlog > 0).length} product${rows.filter(r => r.backlog > 0).length === 1 ? '' : 's'} behind</small></div>
+    <div class="${back ? 'bad' : due > 0 ? 'good' : ''}"><span>Backlog</span><b>${fmt(back)}${!back && due > 0 ? '<span class="okb">✓</span>' : ''}</b><small>${back || due <= 0 ? `${rows.filter(r => r.backlog > 0).length} product${rows.filter(r => r.backlog > 0).length === 1 ? '' : 's'} behind` : 'all due quantities delivered'}</small></div>
     <div class="${uns ? 'bad' : ''}"><span>Unscheduled</span><b>${fmt(uns)}</b><small>${uns ? rows.filter(r => r.unscheduled).map(r => r.name_en).join(', ') : 'All scheduled'}</small></div>`;
 
   // timeline: planned vs delivered per bi-weekly period, cumulative gap line
@@ -1295,14 +1306,14 @@ function renderDeliveryStatus() {
   const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog);
   $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
     <th>Progress vs contract</th><th class="n">Backlog</th><th>Current / next slot</th><th class="n">Last slot</th><th>Status</th></tr></thead><tbody>` +
-    sorted.map(r => `<tr><td class="pname"><b>${esc(r.name_en)}</b><span class="ar">${esc(r.name_ar)}</span></td>
+    sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete'; return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
-      <td class="n">${fmt(r.due)}</td><td class="n">${fmt(r.delivered)}</td>
+      <td class="n">${fmt(r.due)}</td><td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
       <td>${mini(r.delivered, r.contract)}</td>
-      <td class="n" ${r.backlog ? 'style="color:var(--red);font-weight:800"' : ''}>${fmt(r.backlog)}</td>
+      <td class="n" ${r.backlog ? 'style="color:var(--red);font-weight:800"' : ''}>${ok ? '<span class="okv">✓ 0</span>' : fmt(r.backlog)}</td>
       <td>${r.next_start ? `${fmt(r.next_qty)} <span class="muted">· ${dshort(r.next_start)}–${dshort(r.next_end)}</span>` : '<span class="muted">—</span>'}</td>
       <td class="n">${r.last_plan_date ? dshort(r.last_plan_date) : '—'}</td>
-      <td><span class="pill ${r.status === 'complete' ? 'on_track' : r.status}">${DSTAT[r.status]}</span></td></tr>`).join('') + '</tbody>';
+      <td><span class="pill ${r.status === 'complete' ? 'on_track' : r.status}">${ok ? '✓ ' : ''}${DSTAT[r.status]}</span></td></tr>`; }).join('') + '</tbody>';
 }
 function reasonText(r) {
   const out = [];
