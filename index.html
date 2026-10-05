@@ -429,6 +429,18 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <!-- MATERIALS -->
   <section data-view="materials" hidden>
     <div class="chips" id="deptChips"></div>
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow">Stock vs requirement</div><h2>Material coverage</h2></div>
+        <label class="field" style="flex-direction:row;align-items:center;gap:10px">
+          <span style="white-space:nowrap">Lead time (days)</span>
+          <input type="number" id="mLead" min="0" max="120" step="1" value="0" style="width:90px;min-height:42px" title="Material needed this many days before the client delivery slot">
+        </label></div>
+      <div class="chips" id="matChips"></div>
+      <div class="tbl-wrap"><table id="matTbl"></table></div>
+      <p class="hint">On hand = receipts − issues ± adjustments. Theoretical use = planned qty × (units completed ÷ department plan). Remaining need = planned − theoretical use.<br>
+      Required to date = planned qty × (units due by the status date ÷ department plan), taken from the client delivery schedule. Shortfall = required to date − (receipts ± adjustments); the % is of that date requirement, not of the whole project.<br>
+      Issues and adjustments are folded into On hand — hover it for the breakdown, or see the movement log below and the Excel export.</p>
+    </article>
     <div class="cards">
       <article class="card red"><h3>Shortfall to date</h3><div class="metric" id="mShortPct">—</div><div class="sub" id="mShortSub"></div></article>
       <article class="card red"><h3>At zero stock</h3><div class="metric" id="mZero">—</div><div class="sub">Requirement remaining, nothing on hand</div></article>
@@ -441,18 +453,6 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <div class="kpis" id="mcKpis"></div>
       <div id="mcChart"></div>
       <p class="hint" id="mcHint"></p>
-    </article>
-    <article class="panel">
-      <div class="panel-head"><div><div class="eyebrow">Stock vs requirement</div><h2>Material coverage</h2></div>
-        <label class="field" style="flex-direction:row;align-items:center;gap:10px">
-          <span style="white-space:nowrap">Lead time (days)</span>
-          <input type="number" id="mLead" min="0" max="120" step="1" value="0" style="width:90px;min-height:42px" title="Material needed this many days before the client delivery slot">
-        </label></div>
-      <div class="chips" id="matChips"></div>
-      <div class="tbl-wrap"><table id="matTbl"></table></div>
-      <p class="hint">On hand = receipts − issues ± adjustments. Theoretical use = planned qty × (units completed ÷ department plan). Remaining need = planned − theoretical use.<br>
-      Required to date = planned qty × (units due by the status date ÷ department plan), taken from the client delivery schedule. Shortfall = required to date − (receipts ± adjustments); the % is of that date requirement, not of the whole project.<br>
-      Issues and adjustments are folded into On hand — hover it for the breakdown, or see the movement log below and the Excel export.</p>
     </article>
     <article class="panel section">
       <div class="panel-head"><div><div class="eyebrow">Log</div><h2 id="matLogTitle">Material movements</h2></div></div>
