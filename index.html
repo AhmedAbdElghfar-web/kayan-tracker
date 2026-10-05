@@ -337,7 +337,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <!-- OVERVIEW -->
   <section data-view="overview">
     <article class="panel" style="margin-bottom:22px">
-      <div class="panel-head"><div><div class="eyebrow">Client delivery · by product</div><h2>Delivery status by product</h2></div></div>
+      <div class="panel-head"><div><div class="eyebrow" id="dListEyebrow">Client delivery · by product</div><h2>Delivery status by product</h2></div></div>
       <div class="tbl-wrap"><table id="dStatusTbl"></table></div>
       <p class="hint" id="dHint"></p>
     </article>
@@ -348,7 +348,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
       <article class="card"><h3 id="cRateTitle">Required per day</h3><div class="metric" id="cRate">—</div><div class="sub" id="cRateSub"></div></article>
     </div>
     <article class="panel" style="margin-bottom:22px">
-      <div class="panel-head"><div><div class="eyebrow">Client delivery · whole contract</div><h2>Delivery status against the schedule</h2></div>
+      <div class="panel-head"><div><div class="eyebrow" id="dEyebrow">Client delivery · whole contract</div><h2>Delivery status against the schedule</h2></div>
         <div class="legend"><span><i style="background:var(--target)"></i>Planned</span><span><i style="background:var(--teal)"></i>Delivered</span><span><i style="background:var(--orange)"></i>Cumulative backlog</span></div></div>
       <div class="kpis" id="dKpis"></div>
       <div id="dTimeline"></div>
@@ -890,10 +890,7 @@ function periodShort() {
 }
 function buildSelects() {
   const P = S.ref.products;
-  const cur = $('#fProduct').value;
-  $('#fProduct').innerHTML = '<option value="">All products</option>' +
-    P.map(p => `<option value="${p.id}">${esc(p.name_en)}</option>`).join('');
-  $('#fProduct').value = cur;
+  buildProductOptions();
   const opts = periodOptions();
   if (!S.period || !opts.some(o => o.key === S.period)) S.period = defaultPeriodKey(opts);
   $('#fPeriod').innerHTML = opts.map(o => `<option value="${o.key}">${esc(o.label)}</option>`).join('');
@@ -907,7 +904,9 @@ function buildSelects() {
 }
 function readFilters() {
   const prevStage = S.stage;
-  S.product = $('#fProduct').value; S.risk = ''; S.stage = $('#fStage').value;
+  S.stage = $('#fStage').value;
+  if (S.stage !== prevStage) buildProductOptions();   // product list follows the department
+  S.product = $('#fProduct').value; S.risk = '';
   S.asOfMode = $('#fAsOfSel').value || 'today';
   S.asOf = S.asOfMode === 'today' ? localISO() : S.asOfMode === 'custom' ? ($('#fAsOf').value || S.asOf || localISO()) : S.asOfMode.slice(3);
   $('#fAsOf').value = S.asOf; $('#asOfCustom').style.display = S.asOfMode === 'custom' ? '' : 'none';
@@ -928,6 +927,15 @@ function applyDeptTheme(swap) {
   if (swap) { const m = $('main'); m.classList.remove('dept-swap'); void m.offsetWidth; m.classList.add('dept-swap'); setTimeout(() => m.classList.remove('dept-swap'), 900); }
 }
 function productIds() { return S.product ? [Number(S.product)] : null; }
+// A department's products: those that go through it (Product filter); the products it ships to the client are those whose last stage it is (delivery list).
+const hasStage = (pid, st) => st === 'all' || S.ref.stages.some(x => x.product_id === pid && x.stage === st);
+const shipStage = pid => { const o = ['chassis', 'foam', 'assembly']; return S.ref.stages.filter(x => x.product_id === pid).map(x => x.stage).sort((a, b) => o.indexOf(a) - o.indexOf(b)).at(-1); };
+function buildProductOptions() {
+  const cur = $('#fProduct').value;
+  const list = S.ref.products.filter(p => hasStage(p.id, S.stage));
+  $('#fProduct').innerHTML = '<option value="">All products</option>' + list.map(p => `<option value="${p.id}">${esc(p.name_en)}</option>`).join('');
+  $('#fProduct').value = list.some(p => String(p.id) === cur) ? cur : '';
+}
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
 
 /* ====================== status date (production / materials / assembly) ====================== */
@@ -1325,8 +1333,11 @@ function rateCtx() {
   return { B, off, A, today, fut, tp, planAt, calFull, calLeft };
 }
 function renderDeliveryStatus() {
-  const pids = productIds();
-  const rows = S.dstat.filter(r => !pids || pids.includes(r.product_id));
+  const pids = productIds(), dn = STAGE[S.stage];
+  const rows = S.dstat.filter(r => (!pids || pids.includes(r.product_id)) && (S.stage === 'all' || shipStage(r.product_id) === S.stage));
+  const ids = rows.map(r => r.product_id);   // delivery KPIs, chart and list all use the products this department ships
+  $('#dEyebrow').textContent = S.stage === 'all' ? 'Client delivery · whole contract' : `Client delivery · shipped from ${dn}`;
+  $('#dListEyebrow').textContent = S.stage === 'all' ? 'Client delivery · by product' : `Client delivery · products shipped from ${dn}`;
   const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
   const contract = sum('contract'), due = sum('due'), del = sum('delivered'), back = sum('backlog'), uns = sum('unscheduled');
   $('#dKpis').innerHTML = `
@@ -1338,7 +1349,7 @@ function renderDeliveryStatus() {
 
   // timeline: planned vs delivered per bi-weekly period, cumulative gap line
   const P = S.ref.periods;
-  const per = P.map(p => { const m = S.dm.filter(r => r.period_start === p.s && (!pids || pids.includes(r.product_id)));
+  const per = P.map(p => { const m = S.dm.filter(r => r.period_start === p.s && ids.includes(r.product_id));
     return { ...p, plan: m.reduce((a, r) => a + r.planned, 0), del: m.reduce((a, r) => a + r.delivered, 0) }; });
   // gap = plan due up to min(period end, as-of) − delivered; the current period is pro-rated to the as-of date,
   // so the last gap point equals the Backlog KPI.
@@ -1369,6 +1380,7 @@ function renderDeliveryStatus() {
   $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
     <th title="Delivered ÷ plan due by the as-of date">Achieved %</th><th class="n">Backlog</th>
     <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
+    (sorted.length ? '' : `<tr><td colspan="8" class="empty-state">No product in this selection is shipped to the client from ${dn}.</td></tr>`) +
     sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete', q = reqOf(r);
       return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
