@@ -336,6 +336,11 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
 
   <!-- OVERVIEW -->
   <section data-view="overview">
+    <article class="panel" style="margin-bottom:22px">
+      <div class="panel-head"><div><div class="eyebrow">Client delivery · by product</div><h2>Delivery status by product</h2></div></div>
+      <div class="tbl-wrap"><table id="dStatusTbl"></table></div>
+      <p class="hint" id="dHint"></p>
+    </article>
     <div class="cards">
       <article class="card"><h3 id="cScopeTitle">Project scope</h3><div class="metric" id="cScope">—</div><div class="sub" id="cScopeSub"></div></article>
       <article class="card amber"><h3 id="cStageTitle">Period output</h3><div class="metric" id="cStage">—</div><div class="sub" id="cStageSub"></div></article>
@@ -347,7 +352,6 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
         <div class="legend"><span><i style="background:var(--target)"></i>Planned</span><span><i style="background:var(--teal)"></i>Delivered</span><span><i style="background:var(--orange)"></i>Cumulative backlog</span></div></div>
       <div class="kpis" id="dKpis"></div>
       <div id="dTimeline"></div>
-      <div class="tbl-wrap section"><table id="dStatusTbl"></table></div>
     </article>
     <div class="grid2">
       <article class="panel">
@@ -1308,6 +1312,18 @@ function renderOverview() {
       '<tr><td colspan="10" class="empty-state">No products match the current filters.</td></tr>') + '</tbody>';
 }
 const DSTAT = { complete: 'Complete', na: 'Not due yet', on_track: 'On schedule', at_risk: 'Slightly behind', critical: 'Behind' };
+function rateCtx() {
+  const B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, A = S.asOf, today = localISO(), fut = A > today, E = fut ? today : A;
+  let tp;
+  if (fut) { const d = daysBetween(addDay(E, 1), A, off); tp = d > 0 ? { p: { s: addDay(E, 1), e: A }, days: d, full: d } : null; }
+  else tp = (S.ref.periods || []).map(p => ({ p, days: p.s <= A ? daysBetween(addDay(A, 1), p.e, off) : daysBetween(p.s, p.e, off), full: daysBetween(p.s, p.e, off) }))
+    .find(x => x.p.e >= A && x.days > 0);
+  const planAt = new Map();
+  if (tp && tp.full && !fut) (S.dm || []).filter(x => x.period_start === tp.p.s).forEach(x => planAt.set(x.product_id, x.planned / tp.full));
+  const cOff = BASIS.cal.off, calFull = tp && !fut ? daysBetween(tp.p.s, tp.p.e, cOff) : 0,
+        calLeft = tp && !fut ? (tp.p.s <= A ? daysBetween(addDay(A, 1), tp.p.e, cOff) : calFull) : 0;
+  return { B, off, A, today, fut, tp, planAt, calFull, calLeft };
+}
 function renderDeliveryStatus() {
   const pids = productIds();
   const rows = S.dstat.filter(r => !pids || pids.includes(r.product_id));
@@ -1337,16 +1353,33 @@ function renderDeliveryStatus() {
 
   const order = { critical: 0, at_risk: 1, on_track: 2, na: 3, complete: 4 };
   const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog);
+  // required delivery per day: same rule as the production rate. Future as-of date = target date (to deliver = plan due by then − delivered,
+  // spread over the days from tomorrow); today / past = backlog + the open part of the running (or next) delivery period, net of the product's own surplus.
+  const X = rateCtx(), reqOf = r => {
+    if (!X.tp) return null;
+    let need;
+    if (X.fut) need = Math.max(0, r.due - r.delivered);
+    else { const planDay = X.planAt.get(r.product_id) ?? 0, rem = X.calFull ? planDay * X.tp.full * X.calLeft / X.calFull : 0;
+      need = r.backlog + Math.max(0, rem - Math.max(0, r.delivered - r.due)); }
+    return { need, rate: need / X.tp.days };
+  };
+  const ach = r => { if (!(r.due > 0)) return '<span class="muted">Not due yet</span>';
+    const v = r.delivered / r.due, col = v >= 1 ? 'var(--green)' : v >= 0.9 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="mini"><div class="bar"><div class="d" style="width:${(Math.min(1, v) * 100).toFixed(1)}%;background:${col}"></div></div><em style="font-weight:800;color:${col}">${pct(v)}</em></div>`; };
   $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
-    <th>Progress vs contract</th><th class="n">Backlog</th><th>Current / next slot</th><th class="n">Last slot</th><th>Status</th></tr></thead><tbody>` +
-    sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete'; return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
+    <th title="Delivered ÷ plan due by the as-of date">Achieved %</th><th class="n">Backlog</th>
+    <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
+    sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete', q = reqOf(r);
+      return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
       <td class="n">${fmt(r.due)}</td><td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
-      <td>${mini(r.delivered, r.contract)}</td>
+      <td>${ach(r)}</td>
       <td class="n" ${r.backlog ? 'style="color:var(--red);font-weight:800"' : ''}>${ok ? '<span class="okv">✓ 0</span>' : fmt(r.backlog)}</td>
-      <td>${r.next_start ? `${fmt(r.next_qty)} <span class="muted">· ${dshort(r.next_start)}–${dshort(r.next_end)}</span>` : '<span class="muted">—</span>'}</td>
-      <td class="n">${r.last_plan_date ? dshort(r.last_plan_date) : '—'}</td>
+      <td class="n">${q ? `<b>${q.need > 0 ? r1(q.rate) : '<span class="okv">0</span>'}</b>${q.need > 0 ? `<br><small class="muted">${fmt(Math.round(q.need))} in ${X.tp.days} d</small>` : ''}` : '<span class="muted">—</span>'}</td>
       <td><span class="pill ${r.status === 'complete' ? 'on_track' : r.status}">${ok ? '✓ ' : ''}${DSTAT[r.status]}</span></td></tr>`; }).join('') + '</tbody>';
+  $('#dHint').textContent = X.tp
+    ? `Achieved % = delivered ÷ plan due by ${dshort(S.asOf)}. Required / day = ${X.fut ? `(plan due by ${dshort(S.asOf)} − delivered)` : `backlog + the open part of the ${dshort(X.tp.p.s)}–${dshort(X.tp.p.e)} plan`} ÷ ${X.tp.days} ${X.B.label.toLowerCase()} left (${dshort(X.tp.p.s)}–${dshort(X.tp.p.e)}); a product already ahead of plan needs 0.`
+    : `Achieved % = delivered ÷ plan due by ${dshort(S.asOf)}. No delivery day is left after this date, so no daily rate is calculated.`;
 }
 function reasonText(r) {
   const out = [];
