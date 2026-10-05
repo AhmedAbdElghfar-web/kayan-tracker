@@ -1380,14 +1380,17 @@ function renderDeliveryStatus() {
   const ach = r => { if (!(r.due > 0)) return '<span class="muted">Not due yet</span>';
     const v = r.delivered / r.due, col = v >= 1 ? 'var(--green)' : v >= 0.9 ? 'var(--amber)' : 'var(--red)';
     return `<div class="mini"><div class="bar"><div class="d" style="width:${(Math.min(1, v) * 100).toFixed(1)}%;background:${col}"></div></div><em style="font-weight:800;color:${col}">${pct(v)}</em></div>`; };
-  $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
+  // Chassis / Foam: add the department's completed output per product (complete units = the lowest part count), next to what was delivered
+  const showDone = S.stage === 'chassis' || S.stage === 'foam', doneMap = new Map(((S.dash && S.dash.products) || []).map(r => [r.id, r.done]));
+  const cols = showDone ? 9 : 8;
+  $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th>${showDone ? `<th class="n" title="${dn} completed output to the as-of date: complete units (lowest part count)">Completed<br><small class="muted">${dn}</small></th>` : ''}<th class="n">Delivered</th>
     <th title="Delivered ÷ plan due by the as-of date">Achieved %</th><th class="n">Backlog</th>
     <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
-    (sorted.length ? '' : `<tr><td colspan="8" class="empty-state">No product in this selection belongs to ${dn}.</td></tr>`) +
+    (sorted.length ? '' : `<tr><td colspan="${cols}" class="empty-state">No product in this selection belongs to ${dn}.</td></tr>`) +
     sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete', q = reqOf(r);
       return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
-      <td class="n">${fmt(r.due)}</td><td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
+      <td class="n">${fmt(r.due)}</td>${showDone ? `<td class="n"><b>${doneMap.has(r.product_id) ? fmt(doneMap.get(r.product_id)) : '<span class="muted">—</span>'}</b></td>` : ''}<td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
       <td>${ach(r)}</td>
       <td class="n" ${r.backlog ? 'style="color:var(--red);font-weight:800"' : ''}>${ok ? '<span class="okv">✓ 0</span>' : fmt(r.backlog)}</td>
       <td class="n">${q ? `<b>${q.need > 0 ? r1(q.rate) : '<span class="okv">0</span>'}</b>${q.need > 0 ? `<br><small class="muted">${fmt(Math.round(q.need))} in ${X.tp.days} d</small>` : ''}` : '<span class="muted">—</span>'}</td>
