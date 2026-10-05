@@ -930,6 +930,9 @@ function productIds() { return S.product ? [Number(S.product)] : null; }
 // A department's products: those that go through it (Product filter); the products it ships to the client are those whose last stage it is (delivery list).
 const hasStage = (pid, st) => st === 'all' || S.ref.stages.some(x => x.product_id === pid && x.stage === st);
 const shipStage = pid => { const o = ['chassis', 'foam', 'assembly']; return S.ref.stages.filter(x => x.product_id === pid).map(x => x.stage).sort((a, b) => o.indexOf(a) - o.indexOf(b)).at(-1); };
+// Delivery list of a department = the products it ships itself + every product shipped from Assembly (Assembly is fed by Chassis and Foam):
+// Chassis: Kintra + assembly products (not Spanish / Lab stool / Zahida); Foam: its three + assembly products (not Kintra); Assembly: assembly products only.
+const inDeptList = pid => { if (S.stage === 'all') return true; const sh = shipStage(pid); return sh === S.stage || sh === 'assembly'; };
 function buildProductOptions() {
   const cur = $('#fProduct').value;
   const list = S.ref.products.filter(p => hasStage(p.id, S.stage));
@@ -1334,10 +1337,10 @@ function rateCtx() {
 }
 function renderDeliveryStatus() {
   const pids = productIds(), dn = STAGE[S.stage];
-  const rows = S.dstat.filter(r => (!pids || pids.includes(r.product_id)) && (S.stage === 'all' || shipStage(r.product_id) === S.stage));
+  const rows = S.dstat.filter(r => (!pids || pids.includes(r.product_id)) && inDeptList(r.product_id));
   const ids = rows.map(r => r.product_id);   // delivery KPIs, chart and list all use the products this department ships
-  $('#dEyebrow').textContent = S.stage === 'all' ? 'Client delivery · whole contract' : `Client delivery · shipped from ${dn}`;
-  $('#dListEyebrow').textContent = S.stage === 'all' ? 'Client delivery · by product' : `Client delivery · products shipped from ${dn}`;
+  $('#dEyebrow').textContent = S.stage === 'all' ? 'Client delivery · whole contract' : `Client delivery · ${dn} products`;
+  $('#dListEyebrow').textContent = S.stage === 'all' ? 'Client delivery · by product' : `Client delivery · ${dn} products`;
   const sum = k => rows.reduce((a, r) => a + (r[k] || 0), 0);
   const contract = sum('contract'), due = sum('due'), del = sum('delivered'), back = sum('backlog'), uns = sum('unscheduled');
   $('#dKpis').innerHTML = `
@@ -1380,7 +1383,7 @@ function renderDeliveryStatus() {
   $('#dStatusTbl').innerHTML = `<thead><tr><th>Product</th><th class="n">Contract</th><th class="n">Due to date</th><th class="n">Delivered</th>
     <th title="Delivered ÷ plan due by the as-of date">Achieved %</th><th class="n">Backlog</th>
     <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
-    (sorted.length ? '' : `<tr><td colspan="8" class="empty-state">No product in this selection is shipped to the client from ${dn}.</td></tr>`) +
+    (sorted.length ? '' : `<tr><td colspan="8" class="empty-state">No product in this selection belongs to ${dn}.</td></tr>`) +
     sorted.map(r => { const ok = r.due > 0 && r.delivered >= r.due, full = r.status === 'complete', q = reqOf(r);
       return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
