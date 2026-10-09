@@ -1365,8 +1365,9 @@ function renderDeliveryStatus() {
   });
   $('#dTimeline').innerHTML = tlSVG(per.map(p => ({ ...p, act: p.del })), S.asOf, { aria: 'Planned versus delivered by delivery period' });
 
-  const order = { critical: 0, at_risk: 1, on_track: 2, na: 3, complete: 4 };
-  const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog);
+  // completed products first, then the most behind; inside a group the larger backlog (then larger contract) comes first
+  const order = { complete: 0, critical: 1, at_risk: 2, on_track: 3, na: 4 };
+  const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || b.backlog - a.backlog || b.contract - a.contract);
   // required delivery per day: same rule as the production rate. Future as-of date = target date (to deliver = plan due by then − delivered,
   // spread over the days from tomorrow); today / past = backlog + the open part of the running (or next) delivery period, net of the product's own surplus.
   const X = rateCtx(), reqOf = r => {
