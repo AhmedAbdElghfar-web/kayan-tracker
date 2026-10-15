@@ -1322,7 +1322,7 @@ function renderOverview() {
       <td class="reasons">${reasonText(r)}</td></tr>`).join('') ||
       '<tr><td colspan="10" class="empty-state">No products match the current filters.</td></tr>') + '</tbody>';
 }
-const DSTAT = { complete: 'Complete', na: 'Not due yet', on_track: 'On schedule', at_risk: 'Slightly behind', critical: 'Behind' };
+const DSTAT = { complete: 'END OF CONTRACT', na: 'Not due yet', on_track: 'On schedule', at_risk: 'Slightly behind', critical: 'Behind' };
 function rateCtx() {
   const B = BASIS[S.dayBasis] || BASIS.cal, off = B.off, A = S.asOf, today = localISO(), fut = A > today, E = fut ? today : A;
   let tp;
