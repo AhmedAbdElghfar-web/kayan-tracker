@@ -1377,7 +1377,9 @@ function renderDeliveryStatus() {
   rows.forEach(r => { const d = deptMode ? dmap.get(r.product_id) : null;
     r.dep = d || null; r.bk = !deptMode ? r.backlog : d ? Math.max(0, (d.due || 0) - (d.done || 0)) : null; });
   const last = r => onlyStage(r.product_id) === 'foam' ? 1 : 0;   // foam-only products go to the end of the list
-  const sorted = [...rows].sort((a, b) => last(a) - last(b) || order[a.status] - order[b.status] || (b.bk || 0) - (a.bk || 0) || b.contract - a.contract);
+  // order = Achieved % (delivered ÷ plan due), best first: contract complete on top, "Not due yet" at the end; foam-only products last
+  const achOf = r => r.status === 'complete' ? 1e9 : r.due > 0 ? r.delivered / r.due : -1;
+  const sorted = [...rows].sort((a, b) => last(a) - last(b) || achOf(b) - achOf(a) || b.contract - a.contract);
   // required delivery per day: same rule as the production rate. Future as-of date = target date (to deliver = plan due by then − delivered,
   // spread over the days from tomorrow); today / past = backlog + the open part of the running (or next) delivery period, net of the product's own surplus.
   const X = rateCtx(), reqOf = r => {
