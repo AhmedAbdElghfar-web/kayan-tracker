@@ -142,12 +142,6 @@ main.dept-swap [data-view=overview] .card:nth-child(4){animation-delay:.15s}
 
 /* tables */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-/* desktop: filters and the product list header stay pinned while the list scrolls */
-@media (min-width:900px){
-  #filters{position:sticky;top:var(--tabs-h,76px);z-index:15;background:var(--dept-bg);padding:12px 0 14px;margin-bottom:18px;box-shadow:0 10px 14px -12px rgba(16,36,56,.45)}
-  .tbl-sticky{overflow:visible}
-  .tbl-sticky thead th{position:sticky;top:calc(var(--tabs-h,76px) + var(--filters-h,0px));z-index:5;background:#fff;box-shadow:0 1px 0 var(--line)}
-}
 table{width:100%;border-collapse:collapse;font-size:15px}
 th{text-align:left;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:#56677a;font-weight:900;padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap}
 td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
@@ -344,7 +338,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <section data-view="overview">
     <article class="panel" style="margin-bottom:22px">
       <div class="panel-head"><div><div class="eyebrow" id="dListEyebrow">Client delivery · by product</div><h2>Delivery status by product</h2></div></div>
-      <div class="tbl-wrap tbl-sticky"><table id="dStatusTbl"></table></div>
+      <div class="tbl-wrap"><table id="dStatusTbl"></table></div>
       <p class="hint" id="dHint"></p>
     </article>
     <div class="cards">
@@ -927,11 +921,6 @@ function buildAsOf() {
     ends.map(e => `<option value="pe:${e}">End of period · ${dshort(e)}</option>`).join('') +
     '<option value="custom">Custom date…</option>';
   $('#fAsOfSel').value = [...$('#fAsOfSel').options].some(o => o.value === mode) ? mode : 'today';
-}
-function syncStickyVars() {
-  const r = document.documentElement.style, t = $('nav.tabs'), f = $('#filters');
-  r.setProperty('--tabs-h', t.offsetHeight + 'px');
-  r.setProperty('--filters-h', (f.hidden ? 0 : f.offsetHeight + 18) + 'px');   // + its bottom margin
 }
 function applyDeptTheme(swap) {
   document.documentElement.dataset.dept = S.tab === 'overview' || !S.tab ? S.stage : '';
@@ -2132,7 +2121,6 @@ function showTab(tab) {
   $('#asOfCustom').style.display = ASOF_TABS.includes(tab) && S.asOfMode === 'custom' ? '' : 'none';  // custom date box only in Custom mode
   $$('#filters [data-for=monthly]').forEach(el => el.style.display = MONTHLY.includes(tab) ? '' : 'none');
   $('#filters').hidden = tab === 'record';
-  syncStickyVars();
   if (tab === 'overview') $('#customRange').classList.toggle('on', S.period === 'custom');
   $('#inView').hidden = tab === 'record';
   refresh();
@@ -2158,7 +2146,6 @@ async function refresh() {
   return refreshing;
 }
 function initFilters() {
-  syncStickyVars(); new ResizeObserver(syncStickyVars).observe($('#filters')); new ResizeObserver(syncStickyVars).observe($('nav.tabs')); window.addEventListener('resize', syncStickyVars);
   $('#fAsOf').value = S.asOf; S.asOfMode = 'today'; applyDeptTheme(false);
   ['#fProduct', '#fStage', '#fAsOfSel', '#fAsOf', '#fMonth'].forEach(id =>
     $(id).addEventListener('change', () => { readFilters(); refresh(); }));
