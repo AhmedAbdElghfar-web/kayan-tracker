@@ -218,6 +218,8 @@ tr.ok-row td{background:rgba(31,157,107,.075)}
 tr.ok-row td:first-child{box-shadow:inset 5px 0 0 var(--green)}
 tr.ok-row .pname b{color:#146b49}
 .okv{color:var(--green);font-weight:900}
+.onlytag{display:block;width:fit-content;margin:3px 0 2px;padding:1px 10px;border-radius:999px;font-size:12.5px;font-weight:800;background:#eef3f7;color:#41505f}
+.onlytag.foam{background:#fdeedd;color:#b25a0c}.onlytag.chassis{background:#e3edf8;color:#1f5a9a}
 @keyframes okPop{0%{transform:scale(0) rotate(-40deg)}100%{transform:scale(1) rotate(0)}}
 @keyframes okPulse{0%{box-shadow:0 0 0 0 rgba(31,157,107,.45)}100%{box-shadow:0 0 0 12px rgba(31,157,107,0)}}
 @media (prefers-reduced-motion:reduce){.okb{animation:none}}
@@ -928,6 +930,9 @@ function applyDeptTheme(swap) {
 }
 function productIds() { return S.product ? [Number(S.product)] : null; }
 // A department's products: those that go through it (Product filter); the products it ships to the client are those whose last stage it is (delivery list).
+const onlyStage = pid => { const st = S.ref.stages.filter(x => x.product_id === pid); return st.length === 1 ? st[0].stage : null; };
+const ONLY_AR = { foam: 'فوم فقط', chassis: 'شاسيه فقط', assembly: 'تجميع فقط' };
+const onlyTag = pid => { const o = onlyStage(pid); return o ? ONLY_AR[o] : ''; };
 const hasStage = (pid, st) => st === 'all' || S.ref.stages.some(x => x.product_id === pid && x.stage === st);
 const shipStage = pid => { const o = ['chassis', 'foam', 'assembly']; return S.ref.stages.filter(x => x.product_id === pid).map(x => x.stage).sort((a, b) => o.indexOf(a) - o.indexOf(b)).at(-1); };
 // Delivery list of a department = the products it ships itself + every product shipped from Assembly (Assembly is fed by Chassis and Foam):
@@ -936,7 +941,7 @@ const inDeptList = pid => { if (S.stage === 'all') return true; const sh = shipS
 function buildProductOptions() {
   const cur = $('#fProduct').value;
   const list = S.ref.products.filter(p => hasStage(p.id, S.stage));
-  $('#fProduct').innerHTML = '<option value="">All products</option>' + list.map(p => `<option value="${p.id}">${esc(p.name_en)}</option>`).join('');
+  $('#fProduct').innerHTML = '<option value="">All products</option>' + list.map(p => `<option value="${p.id}">${esc(p.name_en)}${onlyTag(p.id) ? ' · ' + onlyTag(p.id) : ''}</option>`).join('');
   $('#fProduct').value = list.some(p => String(p.id) === cur) ? cur : '';
 }
 const pname = id => S.ref.products.find(p => p.id === id)?.name_en || id;
@@ -1371,7 +1376,8 @@ function renderDeliveryStatus() {
   // Backlog of the selected department = its plan due by the as-of date − its completed output (All departments: client delivery backlog)
   rows.forEach(r => { const d = deptMode ? dmap.get(r.product_id) : null;
     r.dep = d || null; r.bk = !deptMode ? r.backlog : d ? Math.max(0, (d.due || 0) - (d.done || 0)) : null; });
-  const sorted = [...rows].sort((a, b) => order[a.status] - order[b.status] || (b.bk || 0) - (a.bk || 0) || b.contract - a.contract);
+  const last = r => onlyStage(r.product_id) === 'foam' ? 1 : 0;   // foam-only products go to the end of the list
+  const sorted = [...rows].sort((a, b) => last(a) - last(b) || order[a.status] - order[b.status] || (b.bk || 0) - (a.bk || 0) || b.contract - a.contract);
   // required delivery per day: same rule as the production rate. Future as-of date = target date (to deliver = plan due by then − delivered,
   // spread over the days from tomorrow); today / past = backlog + the open part of the running (or next) delivery period, net of the product's own surplus.
   const X = rateCtx(), reqOf = r => {
@@ -1396,7 +1402,7 @@ function renderDeliveryStatus() {
     <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
     (sorted.length ? '' : `<tr><td colspan="${cols}" class="empty-state">No product in this selection belongs to ${dn}.</td></tr>`) +
     sorted.map(r => { const full = r.status === 'complete', ok = full || (r.due > 0 && r.delivered >= r.due), q = reqOf(r);   // a completed contract is green even if its delivery date has not come yet
-      return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}<span class="ar">${esc(r.name_ar)}</span></td>
+      return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}${onlyTag(r.product_id) ? `<span class="onlytag ${onlyStage(r.product_id)}">${onlyTag(r.product_id)}</span>` : ''}<span class="ar">${esc(r.name_ar)}</span></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
       <td class="n">${fmt(r.due)}</td>${showDone ? `<td class="n"><b>${doneMap.has(r.product_id) ? fmt(doneMap.get(r.product_id)) : '<span class="muted">—</span>'}</b></td>` : ''}<td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
       <td>${ach(r)}</td>
