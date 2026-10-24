@@ -58,6 +58,9 @@ header .eyebrow{color:#3bb7dd}
 .dot.off{background:#e5822b;box-shadow:0 0 0 4px rgba(229,130,43,.2)}
 .btn-ghost{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:10px;padding:12px 20px;font-size:17px;font-weight:600;cursor:pointer}
 .btn-ghost:hover{background:rgba(255,255,255,.08)}
+/* snapshot button sits on a white panel (btn-ghost is white-on-dark and was invisible there) */
+.btn-snap{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:10px;padding:11px 18px;font-size:15px;font-weight:800;background:#1f9d6b;color:#fff;cursor:pointer;box-shadow:0 2px 6px rgba(31,157,107,.35)}
+.btn-snap:hover{background:#188a5b}.btn-snap:disabled{opacity:.6;cursor:progress}
 
 /* tabs */
 nav.tabs{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
@@ -347,7 +350,7 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   <section data-view="overview">
     <article class="panel" id="dListPanel" style="margin-bottom:22px">
       <div class="panel-head"><div><div class="eyebrow" id="dListEyebrow">Client delivery · by product</div><h2>Delivery status by product</h2></div>
-        <button class="btn-ghost" id="snapBtn" type="button" data-html2canvas-ignore="true" title="Take a picture of this list and share it to a WhatsApp group">Share snapshot to WhatsApp</button></div>
+        <button class="btn-snap" id="snapBtn" type="button" data-html2canvas-ignore="true" title="Take a picture of this list and share it to a WhatsApp group">Share snapshot to WhatsApp</button></div>
       <div class="tbl-wrap"><table id="dStatusTbl"></table></div>
       <p class="hint" id="dHint" data-html2canvas-ignore="true"></p>
     </article>
