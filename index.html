@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>KAYAN · Manufacturing & Delivery Control</title>
-<meta name="theme-color" content="#0f2a43">
+<meta name="theme-color" content="#17222d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="KAYAN Tracker">
@@ -12,7 +12,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f2a43'/%3E%3Crect x='12' y='34' width='10' height='18' fill='%2333b0d6'/%3E%3Crect x='27' y='24' width='10' height='28' fill='%2333b0d6'/%3E%3Crect x='42' y='12' width='10' height='40' fill='%2333b0d6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -257,8 +257,108 @@ dialog .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
 pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;font-size:13px;max-height:220px;overflow:auto;font-family:var(--font)}
 [hidden]{display:none!important}
 
+
+/* ====================== design pass: shop-floor board ======================
+   One memorable element: the delivery list reads like a production board (status edge on every row, chair pictures, bold figures).
+   Everything else is kept quiet: flat panels, one radius scale, sentence-case labels, no decorative motion. */
+:root{
+  --navy:#17222d; --navy-2:#233342; --ink:#17222d; --muted:#586878; --faint:#8593a1; --line:#d8dfe6;
+  --red:#c4333e; --red-bg:#fbe5e7; --green:#168a55; --green-bg:#dcf2e6; --amber:#c98a00; --amber-bg:#fbf0d3;
+  --r-panel:12px; --r-ctl:8px;
+  --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --ar:'IBM Plex Sans Arabic','Segoe UI',Tahoma,sans-serif;
+}
+body{font-size:14.5px;line-height:1.5}
+:focus-visible{outline:2px solid var(--dept);outline-offset:2px}
+.num,td.n,.metric,.mini em,.pct,.kpis b{font-variant-numeric:tabular-nums lining-nums}
+
+/* header and tabs: slimmer, so the board starts higher */
+header.top .wrap{min-height:64px;padding-block:10px;gap:18px}
+.logo{height:32px;gap:3px}.logo i{width:8px;border-radius:1px}
+.eyebrow{font-weight:600;letter-spacing:0;text-transform:none;font-size:13px}
+header .eyebrow{color:#9fb3c6;font-size:12.5px}
+.brand h1{margin:1px 0 0;font-size:clamp(17px,1.7vw,21px);font-weight:600;letter-spacing:0}
+.through{font-size:12.5px}.through b{font-size:15px;font-weight:600}
+.dot{width:9px;height:9px;box-shadow:0 0 0 3px rgba(47,208,142,.18)}
+.btn-ghost{padding:8px 14px;font-size:14px;font-weight:500;border-radius:var(--r-ctl);gap:8px}
+.btn-ghost svg{width:16px;height:16px}
+nav.tabs button{padding:14px 14px 11px;font-size:15px;font-weight:500;border-bottom-width:3px}
+nav.tabs button[aria-selected=true]{font-weight:600}
+
+/* filters: compact toolbar, sentence-case labels */
+main{padding-block:20px 48px}
+.filters{gap:10px 14px;margin-bottom:18px}
+.field{gap:5px}
+.field>span{font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+select,input[type=date],input[type=number],input[type=text],input[type=password],textarea{border-radius:var(--r-ctl);padding:8px 12px;font-size:15px;min-height:42px;border-color:#c9d3dc}
+.filters select{min-width:170px}.filters .product select{min-width:280px}
+#fStage{border-width:1.5px;font-weight:600;box-shadow:0 0 0 3px color-mix(in srgb,var(--dept) 14%,transparent)}
+.linkbtn{font-size:14px;font-weight:600;padding:8px 6px}
+.inview{font-size:13.5px;padding-bottom:10px}
+
+/* KPI cards: one connected strip instead of four separate boxes */
+.cards{gap:0;margin-bottom:18px;background:#fff;border:1px solid var(--line);border-radius:var(--r-panel);overflow:hidden}
+.card{border:0;border-top:3px solid var(--dept);border-left:1px solid var(--line);border-radius:0;box-shadow:none;padding:16px 20px 14px;background:transparent}
+.card:first-child{border-left:0}
+.card.off{background:#f3f5f7;opacity:.7}
+.card h3{margin:0 0 8px;font-size:13.5px;font-weight:600;letter-spacing:0;color:var(--muted)}
+.metric{font-size:clamp(26px,2.2vw,36px);font-weight:700;letter-spacing:-.015em}
+.metric small{font-weight:600}
+.sub{font-size:13.5px;margin-top:6px;line-height:1.5}
+
+/* panels: flat, hairline border, no shadow; the small label sits under the heading */
+.panel{border-radius:var(--r-panel);box-shadow:none;padding:20px 22px;border-color:var(--line)}
+.grid2{gap:18px;margin-bottom:18px}
+.panel-head{margin-bottom:14px;gap:12px}
+.panel-head>div:first-child{display:flex;flex-direction:column-reverse}
+.panel h2{margin:0;font-size:18px;font-weight:600;letter-spacing:0}
+.panel .eyebrow{color:var(--muted);font-size:13px;margin-top:2px}
+.legend{font-size:13.5px;gap:14px}
+
+/* charts follow the department colour */
+.bar{border-radius:3px;height:22px}
+.bar .t{background:color-mix(in srgb,var(--dept) 20%,#fff);border-radius:3px}
+.bar .d{background:var(--dept);border-radius:3px}
+.bars .name{font-size:14.5px;font-weight:600}.bars .pct{font-size:15px;font-weight:700}
+.kv li{padding:11px 0;font-size:14.5px}.kv li b{font-weight:700}
+.insight{font-size:14px;padding:11px 14px;margin-top:16px}
+.donut .c b{font-weight:700}
+
+/* tables */
+table{font-size:14px}
+th{font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid #c9d3dc}
+td{padding:9px 10px;border-bottom:1px solid #e6ebf0}
+tr.click:hover td{background:#f5f8fa}
+.pill{font-size:12.5px;font-weight:600;padding:3px 10px}
+.mini .bar{height:10px}
+.pname b{font-weight:600}
+
+/* the delivery board */
+#dListPanel{padding:18px 22px 10px}
+#dStatusTbl td{padding:8px 10px}
+#dStatusTbl td.n{font-size:16px;font-weight:700}
+#dStatusTbl td.n small{font-size:12px;font-weight:500}
+#dStatusTbl td:first-child{box-shadow:inset 6px 0 0 var(--st,#b9c4ce);padding-left:16px}
+#dStatusTbl tr.st-critical{--st:var(--red)}
+#dStatusTbl tr.st-at_risk{--st:var(--amber)}
+#dStatusTbl tr.st-on_track,#dStatusTbl tr.st-complete{--st:var(--green)}
+#dStatusTbl tr.st-na{--st:#b9c4ce}
+#dStatusTbl tr.ok-row td{background:rgba(22,138,85,.06)}
+#dStatusTbl tr.ok-row td:first-child{box-shadow:inset 6px 0 0 var(--green)}
+#dStatusTbl .mini{min-width:150px}
+#dStatusTbl .mini .bar{height:12px;border-radius:3px}
+#dStatusTbl .mini em{font-size:15px;font-weight:700}
+#dStatusTbl .pill{font-size:12px;letter-spacing:.01em}
+.pimg{width:52px;height:52px;border-radius:8px;padding:2px}
+.pname .ar{font-size:12.5px}
+.okb{animation:none;width:20px;height:20px;font-size:12px}   /* no looping motion on completed rows */
+.okb.full{height:20px;font-size:11.5px;letter-spacing:.02em}
+.onlytag{font-size:12px;font-weight:600}
+.btn-snap{padding:8px 14px;font-size:14px;font-weight:600;border-radius:var(--r-ctl);box-shadow:none}
+
+
 @media (max-width:1180px){
   .cards{grid-template-columns:repeat(2,1fr)}
+  .card:nth-child(3){border-left:0}.card:nth-child(n+3){border-top:1px solid var(--line)}
   .grid2{grid-template-columns:1fr}
   .forms{grid-template-columns:1fr 1fr}
 }
@@ -278,6 +378,8 @@ pre.warn{white-space:pre-wrap;background:#f5f7f9;border-radius:8px;padding:12px;
   .linkbtn{font-size:15px;justify-self:start;padding:8px 0}
   nav.tabs button{font-size:16px;padding:16px 10px 14px}
   .cards,.cards.three,.forms{grid-template-columns:1fr}
+  .card{border-left:0;border-top:1px solid var(--line)}.card:first-child{border-top:3px solid var(--dept)}
+  #dStatusTbl td.n{font-size:15px}
   .kpis{grid-template-columns:1fr 1fr}.kpis div{border-left:0;border-top:1px solid var(--line)}
   .kpis.six{grid-template-columns:1fr 1fr}.kpis.six div{border-left:0;border-top:1px solid var(--line)}
   .recbar .hint{margin-left:0}
@@ -1444,7 +1546,7 @@ function renderDeliveryStatus() {
     <th class="n" title="${X.tp ? `To deliver ÷ ${X.tp.days} ${X.B.label.toLowerCase()} from ${dshort(X.tp.p.s)} to ${dshort(X.tp.p.e)}` : 'No days left'}">Required / day</th><th>Status</th></tr></thead><tbody>` +
     (sorted.length ? '' : `<tr><td colspan="${cols}" class="empty-state">No product in this selection belongs to ${dn}.</td></tr>`) +
     sorted.map(r => { const full = r.status === 'complete', ok = full || (r.due > 0 && r.delivered >= r.due), q = reqOf(r);   // a completed contract is green even if its delivery date has not come yet
-      return `<tr class="${ok ? 'ok-row' : ''}"><td class="pname"><div class="pcell">${pimg(r.product_id)}<div><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}${onlyTag(r.product_id) ? `<span class="onlytag ${onlyStage(r.product_id)}">${onlyTag(r.product_id)}</span>` : ''}<span class="ar">${esc(r.name_ar)}</span></div></div></td>
+      return `<tr class="${ok ? 'ok-row' : ''} st-${r.status}"><td class="pname"><div class="pcell">${pimg(r.product_id)}<div><b>${esc(r.name_en)}</b>${ok ? (full ? '<span class="okb full" title="Whole contract delivered">✓ CONTRACT COMPLETE</span>' : '<span class="okb" title="Delivered in full according to the plan">✓</span>') : ''}${onlyTag(r.product_id) ? `<span class="onlytag ${onlyStage(r.product_id)}">${onlyTag(r.product_id)}</span>` : ''}<span class="ar">${esc(r.name_ar)}</span></div></div></td>
       <td class="n">${fmt(r.contract)}${r.unscheduled ? `<br><small style="color:var(--red);font-weight:800" title="Contract qty not placed in any delivery period">${fmt(r.unscheduled)} unscheduled</small>` : ''}</td>
       <td class="n">${fmt(r.due)}</td>${showDone ? `<td class="n"><b>${doneMap.has(r.product_id) ? fmt(doneMap.get(r.product_id)) : '<span class="muted">—</span>'}</b></td>` : ''}<td class="n ${ok ? 'okv' : ''}">${fmt(r.delivered)}</td>
       <td>${ach(r)}</td>
