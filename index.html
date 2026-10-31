@@ -1104,7 +1104,8 @@ function monthOptions() {
 function monthRange(m = S.month) { const [y, mm] = m.split('-').map(Number); return { from: `${m}-01`, to: `${m}-${pad(lastDay(y, mm - 1))}` }; }
 // delivery period containing the date (else the last one that started before it, else the first)
 function periodOf(a) { const P = S.ref.periods; return P.find(p => p.s <= a && p.e >= a) || [...P].reverse().find(p => p.s <= a) || P[0]; }
-const periodLabel = a => { const p = periodOf(a); return `${dshort(p.s)}–${dshort(p.e)}`; };
+const logRange = a => { const p = periodOf(a); return { from: p.s, to: a > p.e ? a : p.e }; };
+const periodLabel = a => { const r = logRange(a); return `${dshort(r.from)}–${dshort(r.to)}`; };
 function viewAsOf() { return MONTHLY.includes(S.tab) ? monthRange().to : S.asOf; }
 function prevMonth(m = S.month) { const [y, mm] = m.split('-').map(Number); return mm === 1 ? `${y - 1}-12` : `${y}-${pad(mm - 1)}`; }
 function setStatusLine() {
@@ -1584,7 +1585,7 @@ function mini(done, plan) {
 
 /* ====================== production ====================== */
 async function loadProduction() {
-  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
+  const A = viewAsOf(), r = logRange(A);
   const [matrix, log, flow, ser] = await Promise.all([
     rpc('kayan_stage_matrix', { p_as_of: A }),
     q(sb.from('kayan_production_entries').select('*').eq('deleted', false).gte('entry_date', r.from).lte('entry_date', r.to)
@@ -1701,7 +1702,7 @@ function compDetail(s, cols) {
 
 /* ====================== materials ====================== */
 async function loadMaterials() {
-  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
+  const A = viewAsOf(), r = logRange(A);
   const [st, log, ser] = await Promise.all([
     rpc('kayan_material_status', { p_as_of: A, p_lead_days: S.matLead }),
     q(sb.from('kayan_material_txns').select('*').eq('deleted', false).gte('txn_date', r.from).lte('txn_date', r.to)
@@ -1731,7 +1732,7 @@ function renderMaterials(log) {
   $$('#deptChips .chip').forEach(b => b.onclick = () => { S.matDept = b.dataset.d; renderMaterials(log); });
   if (S.matDept) rows = rows.filter(r => r.stages.includes(S.matDept));
   renderMatChart(rows);
-  const mp = periodOf(viewAsOf()), mpl = `${dshort(mp.s)}–${dshort(mp.e)}`;
+  const mpl = periodLabel(viewAsOf());
   $('#matLogTitle').textContent = `Material movements in the period ${mpl}`;
   const c = { zero: 0, short: 0, covered: 0, complete: 0 }; rows.forEach(r => c[r.status]++);
   const reqTD = rows.reduce((a, r) => a + Number(r.required_to_date), 0);
@@ -1766,7 +1767,7 @@ function renderMaterials(log) {
 
 /* ====================== assembly & delivery ====================== */
 async function loadAssembly() {
-  const A = viewAsOf(), cp = periodOf(A), r = { from: cp.s, to: cp.e };
+  const A = viewAsOf(), r = logRange(A);
   const [dm, log, dash, flow, dstat] = await Promise.all([
     rpc('kayan_delivery_matrix', { p_as_of: A }),
     q(sb.from('kayan_deliveries').select('*').eq('deleted', false).gte('delivery_date', r.from).lte('delivery_date', r.to)
